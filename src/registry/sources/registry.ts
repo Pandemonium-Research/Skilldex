@@ -1,7 +1,7 @@
 // Skilldex Registry API client
 // Connects to the hosted registry at SKILLDEX_REGISTRY_URL (default: https://registry.skilldex.dev/v1)
 
-const REGISTRY_BASE = process.env.SKILLDEX_REGISTRY_URL ?? 'https://registry.skilldex.dev/v1'
+const REGISTRY_BASE = process.env.SKILLDEX_REGISTRY_URL ?? 'https://skilldex-registry.vercel.app/v1'
 
 export interface RegistrySkill {
   name: string
