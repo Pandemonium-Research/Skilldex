@@ -34,14 +34,17 @@ skillpm list
 **Requirements:** Node.js 20+
 
 ```bash
-# From source (current)
+npm install -g skilldex-cli
+```
+
+**Or from source:**
+
+```bash
 git clone https://github.com/Pandemonium-Research/Skilldex.git
 cd Skilldex
 npm install
 npm run build
 npm link           # makes skillpm / spm available globally
-
-# Future: npm install -g skilldex
 ```
 
 Both `skillpm` and `spm` are identical — `spm` is a convenience alias:

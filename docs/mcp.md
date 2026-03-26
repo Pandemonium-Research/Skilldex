@@ -6,12 +6,19 @@ Skilldex exposes a Model Context Protocol (MCP) server so Claude Code can invoke
 
 ## Setup
 
-### 1. Build Skilldex
+### 1. Install Skilldex
+
+```bash
+npm install -g skilldex-cli
+```
+
+Or from source:
 
 ```bash
 git clone https://github.com/Pandemonium-Research/Skilldex.git
 cd Skilldex
 npm install && npm run build
+npm link
 ```
 
 ### 2. Configure Claude Code
@@ -24,26 +31,24 @@ Add the server to your MCP config. Claude Code looks for `.mcp.json` in the proj
 {
   "mcpServers": {
     "skilldex": {
-      "command": "node",
-      "args": ["/absolute/path/to/Skilldex/dist/mcp/server.js"],
-      "env": {
-        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
-      }
+      "command": "skillpm",
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-The `ANTHROPIC_API_KEY` is only needed if you use the `skilldex_suggest` tool.
-
-**After `npm install -g skilldex` (future):**
+The `ANTHROPIC_API_KEY` environment variable is only needed if you use the `skilldex_suggest` tool. Add it to the config if needed:
 
 ```json
 {
   "mcpServers": {
     "skilldex": {
       "command": "skillpm",
-      "args": ["mcp"]
+      "args": ["mcp"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+      }
     }
   }
 }
