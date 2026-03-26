@@ -1,5 +1,5 @@
 {
-  "name": "skilldex",
+  "name": "skilldex-cli",
   "version": "0.1.0",
   "description": "Package manager and registry for Claude skill packages",
   "type": "module",
