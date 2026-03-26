@@ -5,6 +5,7 @@ import { registerList } from './commands/list.js'
 import { registerValidate } from './commands/validate.js'
 import { registerSuggest } from './commands/suggest.js'
 import { registerPublish } from './commands/publish.js'
+import { registerSearch } from './commands/search.js'
 
 export function createCli(): Command {
   const program = new Command()
@@ -21,6 +22,7 @@ export function createCli(): Command {
   registerValidate(program)
   registerSuggest(program)
   registerPublish(program)
+  registerSearch(program)
 
   // Hidden MCP server command
   program
