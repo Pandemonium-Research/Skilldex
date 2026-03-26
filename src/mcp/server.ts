@@ -117,22 +117,26 @@ export async function startMcpServer(): Promise<void> {
     }
   )
 
-  // skilldex_search (stub)
+  // skilldex_search
   server.tool(
     'skilldex_search',
-    'Search the Skilldex registry for skills (coming soon)',
+    'Search the Skilldex registry for skills by name, description, or tags',
     {
       query: z.string().describe('Search query'),
+      tier: z.enum(['verified', 'community']).optional().describe('Filter by trust tier'),
+      limit: z.number().int().min(1).max(50).default(10).describe('Number of results to return'),
     },
-    async ({ query }) => {
+    async ({ query, tier, limit }) => {
+      const { searchRegistry } = await import('../registry/sources/registry.js')
+      const result = await searchRegistry({ q: query, tier, limit })
       return {
         content: [
           {
             type: 'text',
             text: JSON.stringify({
-              results: [],
-              total: 0,
-              message: 'Registry search is not yet available in this version.',
+              skills: result.skills,
+              total: result.total,
+              query,
             }),
           },
         ],
