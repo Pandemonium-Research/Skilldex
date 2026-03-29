@@ -33,12 +33,29 @@ skillpm list
 
 **Requirements:** Node.js 20+
 
+**npm** (all platforms)
 ```bash
 npm install -g skilldex-cli
 ```
 
-**Or from source:**
+**Homebrew** (macOS/Linux)
+```bash
+brew tap pandemonium-research/skilldex
+brew install skilldex-cli
+```
 
+**curl** (macOS/Linux)
+```bash
+curl -fsSL https://skilldex-web.vercel.app/install.sh | sh
+```
+
+**Scoop** (Windows)
+```bash
+scoop bucket add skilldex https://github.com/Pandemonium-Research/scoop-skilldex
+scoop install skilldex-cli
+```
+
+**From source**
 ```bash
 git clone https://github.com/Pandemonium-Research/Skilldex.git
 cd Skilldex
