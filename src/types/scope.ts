@@ -5,4 +5,5 @@ export interface ScopeConfig {
   rootPath: string
   manifestPath: string
   skillsDir: string
+  skillsetsDir: string
 }
