@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write  # needed to create GitHub Releases
+
+jobs:
+  release:
+    name: Build, test, publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.version.outputs.VERSION }}
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            **npm**
+            ```bash
+            npm install -g skilldex-cli
+            ```
+
+            **Homebrew**
+            ```bash
+            brew tap pandemonium-research/skilldex
+            brew install skilldex-cli
+            ```
+
+            **curl**
+            ```bash
+            curl -fsSL https://skilldex-web.vercel.app/install.sh | sh
+            ```
+
+            **Scoop**
+            ```bash
+            scoop bucket add skilldex https://github.com/Pandemonium-Research/scoop-skilldex
+            scoop install skilldex-cli
+            ```
