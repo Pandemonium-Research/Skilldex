@@ -6,6 +6,7 @@ import type { ScopeLevel, ScopeConfig } from '../types/scope.js'
 const SKILLDEX_DIR = '.skilldex'
 const MANIFEST_FILE = 'skilldex.json'
 const SKILLS_DIR = 'skills'
+const SKILLSETS_DIR = 'skillsets'
 
 function globalBase(): string {
   return path.join(os.homedir(), '.skilldex', 'global')
@@ -21,6 +22,7 @@ function makeScopeConfig(level: ScopeLevel, rootPath: string): ScopeConfig {
     rootPath,
     manifestPath: path.join(rootPath, MANIFEST_FILE),
     skillsDir: path.join(rootPath, SKILLS_DIR),
+    skillsetsDir: path.join(rootPath, SKILLSETS_DIR),
   }
 }
 
