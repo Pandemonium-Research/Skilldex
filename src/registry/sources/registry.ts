@@ -116,3 +116,98 @@ export async function deleteSkill(token: string, name: string): Promise<void> {
     headers: { Authorization: `Bearer ${token}` },
   })
 }
+
+// --- Skillset registry client ---
+
+export interface RegistrySkillset {
+  name: string
+  description: string
+  author: string | null
+  source_url: string
+  trust_tier: 'verified' | 'community'
+  score: number | null
+  spec_version: string
+  tags: string[]
+  skill_count: number
+  install_count: number
+  published_at: string
+  skills: Array<{ name: string; source_url: string }>
+}
+
+export interface SkillsetInstallInfo {
+  name: string
+  source_url: string
+  score: number | null
+  spec_version: string
+  trust_tier: 'verified' | 'community'
+  skills: Array<{ name: string; source_url: string }>
+}
+
+export interface SkillsetSearchResponse {
+  skillsets: RegistrySkillset[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface PublishSkillsetBody {
+  name: string
+  source_url: string
+  tags?: string[]
+}
+
+export interface PublishSkillsetResponse {
+  skillset: RegistrySkillset
+  diagnostics: Array<{ level: string; line?: number; message: string }>
+}
+
+export async function searchSkillsets(options: SearchOptions = {}): Promise<SkillsetSearchResponse> {
+  const params = new URLSearchParams()
+  if (options.q) params.set('q', options.q)
+  if (options.tier) params.set('tier', options.tier)
+  if (options.min_score !== undefined) params.set('min_score', String(options.min_score))
+  if (options.spec_version) params.set('spec_version', options.spec_version)
+  if (options.tags) params.set('tags', options.tags)
+  if (options.sort) params.set('sort', options.sort)
+  if (options.limit !== undefined) params.set('limit', String(options.limit))
+  if (options.offset !== undefined) params.set('offset', String(options.offset))
+
+  const qs = params.toString()
+  return registryFetch<SkillsetSearchResponse>(`/skillsets${qs ? `?${qs}` : ''}`)
+}
+
+export async function getSkillset(name: string): Promise<RegistrySkillset> {
+  return registryFetch<RegistrySkillset>(`/skillsets/${encodeURIComponent(name)}`)
+}
+
+export async function getSkillsetInstallInfo(name: string): Promise<SkillsetInstallInfo> {
+  return registryFetch<SkillsetInstallInfo>(`/skillsets/${encodeURIComponent(name)}/install`)
+}
+
+export async function publishSkillset(
+  token: string,
+  body: PublishSkillsetBody
+): Promise<PublishSkillsetResponse> {
+  return registryFetch<PublishSkillsetResponse>('/skillsets', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateSkillset(
+  token: string,
+  name: string
+): Promise<PublishSkillsetResponse> {
+  return registryFetch<PublishSkillsetResponse>(`/skillsets/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+export async function deleteSkillset(token: string, name: string): Promise<void> {
+  await registryFetch<void>(`/skillsets/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
