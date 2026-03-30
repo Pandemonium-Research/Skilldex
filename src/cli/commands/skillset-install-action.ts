@@ -73,19 +73,31 @@ async function runRegistrySkillsetInstall(
   name: string,
   options: { scope: ScopeLevel; force: boolean; json: boolean }
 ): Promise<void> {
+  const { mkdtemp, rm } = await import('node:fs/promises')
+  const path = await import('node:path')
+  const os = await import('node:os')
+  const { simpleGit } = await import('simple-git')
+  const { parseGitUrl } = await import('../../registry/sources/github.js')
+  const { getSkillsetInstallInfo } = await import('../../registry/sources/registry.js')
+
   const spinner = options.json ? null : ora(`Looking up skillset "${name}" in registry...`).start()
+  const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'skilldex-skillset-'))
+
   try {
-    const { getSkillsetInstallInfo } = await import('../../registry/sources/registry.js')
     const info = await getSkillsetInstallInfo(name)
 
-    if (spinner) spinner.text = `Installing skillset "${name}" from ${info.source_url}...`
+    if (spinner) spinner.text = `Cloning skillset "${name}" from ${info.source_url}...`
 
-    const { installFromGitUrl } = await import('../../registry/sources/github.js')
-    const { resolveScope } = await import('../../core/resolver.js')
-    const scopeConfig = await resolveScope(options.scope)
+    const parsed = parseGitUrl(`git+${info.source_url}`)
+    const git = simpleGit()
+    const cloneOptions = parsed.branch ? ['--branch', parsed.branch, '--depth', '1'] : ['--depth', '1']
+    await git.clone(parsed.repoUrl, tmpDir, cloneOptions)
 
-    // Clone the skillset repo then install as a skillset from the local clone
-    const tmpResult = await installFromGitUrl(`git+${info.source_url}`, scopeConfig, {
+    const searchRoot = parsed.subPath ? path.join(tmpDir, parsed.subPath) : tmpDir
+
+    if (spinner) spinner.text = `Installing skillset "${name}"...`
+
+    const result = await installSkillsetFromPath(searchRoot, {
       scope: options.scope,
       force: options.force,
       sourceUrl: info.source_url,
@@ -96,18 +108,29 @@ async function runRegistrySkillsetInstall(
     if (options.json) {
       printJson({
         installed: true,
-        skillsetName: name,
-        scope: options.scope,
-        score: tmpResult.validation.score,
+        skillsetName: result.skillsetName,
+        scope: result.scope,
+        score: result.validation.score,
+        embeddedSkills: result.embeddedResults.map((r) => r.skillName),
+        remoteSkills: result.remoteResults.map((r) => r.skillName),
         trust_tier: info.trust_tier,
       })
     } else {
-      printSuccess(`Score: ${tmpResult.validation.score}/100 · Trust: ${info.trust_tier}`)
+      printSuccess(`Score: ${result.validation.score}/100 · Trust: ${info.trust_tier}`)
+      const allSkills = [
+        ...result.embeddedResults.map((r) => r.skillName),
+        ...result.remoteResults.map((r) => r.skillName),
+      ]
+      if (allSkills.length > 0) {
+        printInfo(`  Skills installed: ${allSkills.join(', ')}`)
+      }
     }
   } catch (e) {
     if (spinner) spinner.fail()
     printError(e instanceof Error ? e.message : String(e))
     process.exit(1)
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true })
   }
 }
 
