@@ -7,6 +7,8 @@ import { registerSuggest } from './commands/suggest.js'
 import { registerPublish } from './commands/publish.js'
 import { registerSearch } from './commands/search.js'
 import { registerSkillset } from './commands/skillset.js'
+import { registerUpdate } from './commands/update.js'
+import { registerConfig } from './commands/config.js'
 
 export function createCli(): Command {
   const program = new Command()
@@ -19,12 +21,14 @@ export function createCli(): Command {
 
   registerInstall(program)
   registerUninstall(program)
+  registerUpdate(program)
   registerList(program)
   registerValidate(program)
   registerSuggest(program)
   registerPublish(program)
   registerSearch(program)
   registerSkillset(program)
+  registerConfig(program)
 
   // Hidden MCP server command
   program
