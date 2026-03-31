@@ -3,7 +3,8 @@ import type { ScopeLevel } from '../../types/scope.js'
 import type { SkillManifest } from '../../types/manifest.js'
 import { resolveAllScopes, resolveScope } from '../../core/resolver.js'
 import { readManifest } from '../../core/manifest.js'
-import { printJson, printError } from '../ui/output.js'
+import { printJson, printError, printWarning } from '../ui/output.js'
+import { SPEC_VERSION } from '../../core/validator.js'
 
 export async function runList(options: { scope?: ScopeLevel; json: boolean }): Promise<void> {
   try {
@@ -38,8 +39,11 @@ export async function runList(options: { scope?: ScopeLevel; json: boolean }): P
         for (const skill of skills) {
           const score = skill.score >= 80 ? chalk.green(`${skill.score}`) :
             skill.score >= 50 ? chalk.yellow(`${skill.score}`) : chalk.red(`${skill.score}`)
+          const stale = skill.specVersion !== SPEC_VERSION
+            ? chalk.yellow(` [spec v${skill.specVersion} → run: skillpm update ${skill.name}]`)
+            : ''
           console.log(
-            `  ${chalk.cyan(skill.name.padEnd(30))} score: ${score}/100  source: ${chalk.dim(skill.source)}`
+            `  ${chalk.cyan(skill.name.padEnd(30))} score: ${score}/100  source: ${chalk.dim(skill.source)}${stale}`
           )
         }
       }
