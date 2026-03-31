@@ -9,12 +9,13 @@ export interface SkilldexConfig {
   defaultScope?: 'global' | 'shared' | 'project'
 }
 
-const CONFIG_DIR = path.join(os.homedir(), '.skilldex')
-const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json')
+function getConfigPath(): string {
+  return path.join(os.homedir(), '.skilldex', 'config.json')
+}
 
 export async function readConfig(): Promise<SkilldexConfig> {
   try {
-    const raw = await readFile(CONFIG_PATH, 'utf8')
+    const raw = await readFile(getConfigPath(), 'utf8')
     return JSON.parse(raw) as SkilldexConfig
   } catch {
     return {}
@@ -22,8 +23,9 @@ export async function readConfig(): Promise<SkilldexConfig> {
 }
 
 export async function writeConfig(config: SkilldexConfig): Promise<void> {
-  await mkdir(CONFIG_DIR, { recursive: true })
-  await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', 'utf8')
+  const configPath = getConfigPath()
+  await mkdir(path.dirname(configPath), { recursive: true })
+  await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8')
 }
 
 /**

@@ -6,7 +6,7 @@ import type { SkilldexConfig } from '../../core/config.js'
 import os from 'node:os'
 import path from 'node:path'
 
-const CONFIG_PATH = path.join(os.homedir(), '.skilldex', 'config.json')
+const CONFIG_PATH() = () => path.join(os.homedir(), '.skilldex', 'config.json')
 
 const VALID_KEYS: Array<keyof SkilldexConfig> = [
   'registryUrl',
@@ -38,7 +38,7 @@ export function registerConfig(program: Command): void {
         if (options.json) {
           printJson(config)
         } else {
-          console.log(chalk.dim(`Config file: ${CONFIG_PATH}\n`))
+          console.log(chalk.dim(`Config file: ${CONFIG_PATH()}\n`))
           if (Object.keys(config).length === 0) {
             console.log(chalk.dim('No configuration set. Use `skillpm config set <key> <value>` to configure.'))
           } else {
@@ -92,7 +92,7 @@ export function registerConfig(program: Command): void {
       const config = await readConfig()
       ;(config as Record<string, string>)[key] = value
       await writeConfig(config)
-      printSuccess(`Set ${key} in ${CONFIG_PATH}`)
+      printSuccess(`Set ${key} in ${CONFIG_PATH()}`)
     })
 
   cmd
@@ -120,7 +120,7 @@ export function registerConfig(program: Command): void {
       }
       console.log('')
       console.log(chalk.dim('Environment variables always override config file values.'))
-      console.log(chalk.dim(`Config file: ${CONFIG_PATH}`))
+      console.log(chalk.dim(`Config file: ${CONFIG_PATH()}`))
       console.log('')
     })
 }
