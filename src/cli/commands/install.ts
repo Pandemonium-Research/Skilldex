@@ -9,7 +9,10 @@ export function registerInstall(program: Command): void {
     .option('-f, --force', 'Overwrite if already installed', false)
     .option('--json', 'Output as JSON')
     .action(async (source: string, options: { scope: ScopeLevel; force: boolean; json: boolean }) => {
+      const { getConfigValue } = await import('../../core/config.js')
+      const defaultScope = (await getConfigValue('defaultScope')) ?? 'project'
+      const scope = options.scope ?? defaultScope
       const { runInstall } = await import('./install-action.js')
-      await runInstall(source, options)
+      await runInstall(source, { ...options, scope: scope as ScopeLevel })
     })
 }

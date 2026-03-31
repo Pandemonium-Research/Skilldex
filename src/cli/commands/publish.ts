@@ -45,10 +45,11 @@ export function registerPublish(program: Command): void {
     .option('--update', 'Re-fetch and re-score an already-published skill')
     .option('--json', 'Output as JSON')
     .action(async (options: { sourceUrl?: string; tags?: string; update?: boolean; json: boolean }) => {
-      const token = process.env.SKILLDEX_TOKEN
+      const { getConfigValue } = await import('../../core/config.js')
+      const token = await getConfigValue('token')
       if (!token) {
         printError(
-          'SKILLDEX_TOKEN is not set. Get your token from https://registry.skilldex.dev/auth/github and set it as an environment variable.'
+          'No auth token found. Get your token from https://registry.skilldex.dev/auth/github, then run: skillpm config set token <token>'
         )
         process.exit(1)
       }

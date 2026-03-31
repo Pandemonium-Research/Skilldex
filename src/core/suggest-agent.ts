@@ -67,10 +67,11 @@ export async function gatherProjectContext(projectRoot: string): Promise<string>
 }
 
 export async function generateProposals(context: string): Promise<SuggestionProposal[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const { getConfigValue } = await import('./config.js')
+  const apiKey = await getConfigValue('anthropicApiKey')
   if (!apiKey) {
     throw new Error(
-      'ANTHROPIC_API_KEY environment variable is required for the suggest command'
+      'ANTHROPIC_API_KEY is required for the suggest command. Set it via environment variable or run: skillpm config set anthropicApiKey <key>'
     )
   }
 

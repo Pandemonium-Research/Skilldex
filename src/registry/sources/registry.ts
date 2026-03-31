@@ -1,7 +1,15 @@
 // Skilldex Registry API client
 // Connects to the hosted registry at SKILLDEX_REGISTRY_URL (default: https://registry.skilldex.dev/v1)
+// Resolution order: env var → config file → built-in default
 
-const REGISTRY_BASE = process.env.SKILLDEX_REGISTRY_URL ?? 'https://skilldex-registry.vercel.app/v1'
+async function getRegistryBase(): Promise<string> {
+  try {
+    const { getConfigValue } = await import('../../core/config.js')
+    return (await getConfigValue('registryUrl')) ?? 'https://skilldex-registry.vercel.app/v1'
+  } catch {
+    return process.env.SKILLDEX_REGISTRY_URL ?? 'https://skilldex-registry.vercel.app/v1'
+  }
+}
 
 export interface RegistrySkill {
   name: string
@@ -54,7 +62,8 @@ export interface PublishResponse {
 }
 
 async function registryFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const url = `${REGISTRY_BASE}${path}`
+  const base = await getRegistryBase()
+  const url = `${base}${path}`
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
