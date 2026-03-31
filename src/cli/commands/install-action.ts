@@ -77,6 +77,14 @@ async function runRegistryInstall(
       scope: options.scope,
       force: options.force,
       sourceUrl: info.source_url,
+      onMultipleSkills: async (names) => {
+        if (spinner) spinner.stop()
+        const { select } = await import('@inquirer/prompts')
+        return select({
+          message: 'Multiple skills found in repo. Which one would you like to install?',
+          choices: names.map(n => ({ name: n, value: n })),
+        })
+      },
     })
 
     if (spinner) spinner.succeed(`Installed "${result.skillName}" at ${result.scope} scope`)
@@ -118,6 +126,14 @@ async function runGitInstall(
       scope: options.scope,
       force: options.force,
       sourceUrl: gitUrl,
+      onMultipleSkills: async (names) => {
+        if (spinner) spinner.stop()
+        const { select } = await import('@inquirer/prompts')
+        return select({
+          message: 'Multiple skills found in repo. Which one would you like to install?',
+          choices: names.map(n => ({ name: n, value: n })),
+        })
+      },
     })
 
     if (spinner) spinner.succeed(`Installed "${result.skillName}" at ${result.scope} scope`)

@@ -56,9 +56,16 @@ export async function installFromGitUrl(
       return installFromPath(skillFolders[0], { ...options, sourceUrl: rawUrl })
     }
 
-    // Multiple skills — install all (or first, for simplicity in MVP)
-    // TODO: In a future version, prompt the user to select which ones
-    return installFromPath(skillFolders[0], { ...options, sourceUrl: rawUrl })
+    // Multiple skills found — prompt if interactive callback provided, else pick first
+    const names = skillFolders.map(f => path.basename(f))
+    let selectedName: string
+    if (options.onMultipleSkills) {
+      selectedName = await options.onMultipleSkills(names)
+    } else {
+      selectedName = names[0]
+    }
+    const selectedFolder = skillFolders.find(f => path.basename(f) === selectedName) ?? skillFolders[0]
+    return installFromPath(selectedFolder, { ...options, sourceUrl: rawUrl })
   } finally {
     await rm(tmpDir, { recursive: true, force: true })
   }

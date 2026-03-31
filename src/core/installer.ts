@@ -12,6 +12,8 @@ export interface InstallOptions {
   force?: boolean
   dryRun?: boolean
   sourceUrl?: string
+  /** Called when a repo contains multiple skill folders. Return the name of the folder to install. */
+  onMultipleSkills?: (names: string[]) => Promise<string>
 }
 
 export interface InstallResult {
