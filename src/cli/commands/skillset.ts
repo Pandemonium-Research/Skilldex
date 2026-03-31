@@ -64,5 +64,16 @@ export function registerSkillset(program: Command): void {
       await runSkillsetUninstall(name, options)
     })
 
+  skillset
+    .command('update [skillset-name]')
+    .description('Re-fetch and reinstall an installed skillset from its source URL')
+    .option('-s, --scope <scope>', 'Scope to update in: global, shared, or project', 'project')
+    .option('--all', 'Update all skillsets in the specified scope')
+    .option('--json', 'Output as JSON')
+    .action(async (skillsetName: string | undefined, options: { scope: ScopeLevel; all: boolean; json: boolean }) => {
+      const { runSkillsetUpdate } = await import('./skillset-update-action.js')
+      await runSkillsetUpdate(skillsetName, options)
+    })
+
   program.addCommand(skillset)
 }
