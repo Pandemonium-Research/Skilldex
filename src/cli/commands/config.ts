@@ -6,7 +6,7 @@ import type { SkilldexConfig } from '../../core/config.js'
 import os from 'node:os'
 import path from 'node:path'
 
-const CONFIG_PATH() = () => path.join(os.homedir(), '.skilldex', 'config.json')
+const CONFIG_PATH = () => path.join(os.homedir(), '.skilldex', 'config.json')
 
 const VALID_KEYS: Array<keyof SkilldexConfig> = [
   'registryUrl',
