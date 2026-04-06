@@ -1,0 +1,1 @@
+This directory has no SKILL.md so it is not an embedded skill — it should trigger the allowed-subdirs warning.
