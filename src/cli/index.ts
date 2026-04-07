@@ -16,7 +16,7 @@ export function createCli(): Command {
   program
     .name('skillpm')
     .description('Package manager for Claude skill packages')
-    .version('0.1.0')
+    .version('1.0.0')
     .option('--no-color', 'Disable colored output')
 
   registerInstall(program)
