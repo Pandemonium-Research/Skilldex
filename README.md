@@ -23,6 +23,8 @@ skillpm list
 - [Scope System](#scope-system)
 - [Format Validation & Scoring](#format-validation--scoring)
 - [Agent Suggestion Loop](#agent-suggestion-loop)
+- [Skillsets](#skillsets)
+- [Configuration](#configuration)
 - [Claude Code Integration (MCP)](#claude-code-integration-mcp)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
@@ -127,6 +129,48 @@ skillpm list
 skillpm uninstall forensics-agent --scope project
 ```
 
+### Update an installed skill
+
+```bash
+skillpm update forensics-agent --scope project
+
+# Update all skills in a scope
+skillpm update --all --scope project
+```
+
+Skills must have been installed from a `git+https://` URL or the registry to be updatable. Local-path installs are skipped.
+
+### Search the registry
+
+```bash
+skillpm search forensics
+
+# Filter by trust tier or sort order
+skillpm search ctf --tier verified --sort score --limit 20
+```
+
+```
+Found 3 skills for "forensics" (showing 3)
+
+forensics-agent [verified]
+  Full forensic investigation workflow for CTF and incident response
+  Score: 91/100  ·  Installs: 412  ·  Spec: v1.0
+  Tags: forensics, ctf, analysis
+  skillpm install forensics-agent
+```
+
+### Publish a skill
+
+```bash
+# Run from inside your skill directory — source URL is auto-detected from git remote
+skillpm publish --tags forensics,analysis
+
+# Re-score an already-published skill after changes
+skillpm publish --update
+```
+
+Requires an auth token: get one at `https://registry.skilldex.dev/auth/github`, then `skillpm config set token <token>`.
+
 ### AI-powered skill suggestions
 
 ```bash
@@ -146,10 +190,14 @@ Full reference: [docs/cli.md](docs/cli.md)
 |---|---|
 | `skillpm install <source>` | Install from local path or `git+https://` URL |
 | `skillpm uninstall <name>` | Remove a skill from a scope |
+| `skillpm update [name]` | Re-fetch and reinstall a skill from its source |
 | `skillpm list` | Show all installed skills across scopes |
 | `skillpm validate [path]` | Validate format + show score |
+| `skillpm search <query>` | Search the Skilldex registry |
 | `skillpm suggest` | AI-powered suggestion loop |
-| `skillpm publish` | Publish to registry *(coming soon)* |
+| `skillpm publish` | Publish a skill to the registry |
+| `skillpm skillset <subcommand>` | Manage skillsets (bundles of skills) |
+| `skillpm config <subcommand>` | View and set Skilldex configuration |
 
 **Global options:**
 
@@ -264,6 +312,80 @@ This checkpoint is intentional. Most agent frameworks skip it and auto-execute. 
 
 ---
 
+## Skillsets
+
+A skillset is a named bundle of related skills distributed together — for example, a `ctf-toolkit` skillset that installs `forensics-agent`, `pwn-agent`, and `web-recon` in one step.
+
+```bash
+# Scaffold a new skillset
+skillpm skillset init my-toolkit
+
+# Install a skillset from a local path, git URL, or registry
+skillpm skillset install ./my-toolkit --scope project
+skillpm skillset install git+https://github.com/user/ctf-toolkit --scope project
+
+# List installed skillsets
+skillpm skillset list
+
+# Validate a skillset directory
+skillpm skillset validate ./my-toolkit
+
+# Update an installed skillset from its source
+skillpm skillset update ctf-toolkit --scope project
+skillpm skillset update --all --scope project
+
+# Uninstall a skillset and all its skills
+skillpm skillset uninstall ctf-toolkit --scope project
+
+# Publish a skillset to the registry
+skillpm skillset publish --tags ctf,forensics
+```
+
+**`skillset` subcommands:**
+
+| Subcommand | Description |
+|---|---|
+| `skillset init [name]` | Scaffold a new skillset directory with a `SKILLSET.md` template |
+| `skillset install <source>` | Install from local path, git URL, or registry |
+| `skillset uninstall <name>` | Remove an installed skillset and its skills |
+| `skillset list` | List installed skillsets |
+| `skillset validate [path]` | Validate structure and score `SKILLSET.md` |
+| `skillset update [name]` | Re-fetch and reinstall from source |
+| `skillset publish` | Publish to the Skilldex registry |
+
+---
+
+## Configuration
+
+Skilldex stores persistent configuration in `~/.skilldex/config.json`. Values here are overridden by their corresponding environment variables.
+
+```bash
+# Show all current config values
+skillpm config get
+
+# Get or set a specific key
+skillpm config get registryUrl
+skillpm config set anthropicApiKey sk-ant-...
+skillpm config set defaultScope project
+
+# Remove a key
+skillpm config unset token
+
+# List all valid keys with descriptions
+skillpm config list
+```
+
+**Config keys:**
+
+| Key | Environment variable | Description |
+|---|---|---|
+| `registryUrl` | `SKILLDEX_REGISTRY_URL` | Registry API base URL |
+| `token` | `SKILLDEX_TOKEN` | Publisher auth token |
+| `anthropicApiKey` | `ANTHROPIC_API_KEY` | Anthropic API key for `suggest` |
+| `defaultScope` | `SKILLDEX_DEFAULT_SCOPE` | Default install scope (`global`, `shared`, or `project`) |
+
+---
+
 ## Claude Code Integration (MCP)
 
 Full reference: [docs/mcp.md](docs/mcp.md)
@@ -301,7 +423,7 @@ Once configured, Claude Code can:
 | `skilldex_list` | List installed skills |
 | `skilldex_validate` | Validate and score a skill |
 | `skilldex_suggest` | Generate skill suggestions |
-| `skilldex_search` | Search registry *(stub — coming soon)* |
+| `skilldex_search` | Search the registry |
 
 ---
 
