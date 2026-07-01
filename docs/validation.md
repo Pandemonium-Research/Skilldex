@@ -164,11 +164,14 @@ Any other subdirectory (e.g., `bin/`, `src/`, `test/`) produces a warning.
 **What it checks:** Whether files referenced in `SKILL.md` via markdown links or relative paths actually exist in the skill folder.
 
 **What is detected as a reference:**
-- Markdown links: `[text](path/to/file)`
+- Markdown links: `[text](path/to/file)` — including link titles (`[text](path "title")`) and `#anchors` (the fragment is stripped before checking)
 - Markdown images: `![alt](path/to/image)`
+- Inline-code paths to a known dir: `` `references/api-patterns.md` `` (the spec's recommended way to reference bundled resources)
 - Bare relative paths starting with `scripts/`, `references/`, or `assets/`: `scripts/setup.sh`
 
 **External URLs are ignored** — `https://` and `http://` links are not checked.
+
+Not detected: dot-relative paths (`./scripts/foo.sh`) and reference-style link definitions (`[ref]: path`).
 
 If all references resolve, full 15 pts are awarded. Any broken reference deducts the full 15 pts (the check fails as a whole).
 

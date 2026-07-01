@@ -51,6 +51,34 @@ describe('validateSkill', () => {
     expect(diag?.message).toMatch(/not found/)
   })
 
+  it('catches a broken inline-code reference', async () => {
+    const result = await validateSkill(fixtures('inline-ref-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('error')
+    expect(diag?.message).toMatch(/references\/missing\.md/)
+  })
+
+  it('catches a broken reference with a fragment anchor', async () => {
+    const result = await validateSkill(fixtures('anchored-ref-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('error')
+    expect(diag?.message).toMatch(/references\/missing\.md/)
+  })
+
+  it('catches a broken reference written as a titled markdown link', async () => {
+    const result = await validateSkill(fixtures('titled-ref-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('error')
+    expect(diag?.message).toMatch(/references\/missing\.md/)
+  })
+
+  it('passes referenced-resources when an inline-code reference resolves', async () => {
+    const result = await validateSkill(fixtures('inline-ref-valid-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('pass')
+    expect(result.diagnostics.some((d) => d.check === 'referenced-resources' && d.severity === 'error')).toBe(false)
+  })
+
   it('includes specVersion in result', async () => {
     const result = await validateSkill(fixtures('valid-skill'))
     expect(result.specVersion).toBe('1.0')

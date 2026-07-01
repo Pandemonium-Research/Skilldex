@@ -322,8 +322,14 @@ async function checkBrokenReferences(
   lines: string[]
 ): Promise<BrokenRef[]> {
   const broken: BrokenRef[] = []
-  // Match markdown links, image refs, and plain relative paths referencing known dirs
-  const refPattern = /(?:(?:\[.*?\]\()|(?:!\[.*?\]\())([^)#\s]+)\)|(?:^|\s)((?:scripts|references|assets)\/[^\s)]+)/gm
+  // Detect three reference forms:
+  //   1. Markdown link/image: [text](path) or ![alt](path) — capture stops at ), #, or
+  //      whitespace, so titles ([t](path "title")) and #anchors are captured as path-only.
+  //   2 & 3. Bare or inline-code path to a known dir: scripts/, references/, assets/ — a
+  //      backtick counts as a boundary so inline-code refs (`references/api-patterns.md`) match.
+  // Not handled (rare, absent from the spec's examples): dot-relative paths (./scripts/…)
+  // and reference-style link definitions ([ref]: path).
+  const refPattern = /!?\[[^\]]*\]\(\s*([^)#\s]+)|(?:^|[\s`])((?:scripts|references|assets)\/[^\s`)]+)/gm
 
   let match: RegExpExecArray | null
   while ((match = refPattern.exec(content)) !== null) {
