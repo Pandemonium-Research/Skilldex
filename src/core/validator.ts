@@ -141,7 +141,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
         severity: 'error',
         line: descLine,
         message: 'Required field "description" is missing or empty',
-        check: 'description-length',
+        check: 'description-present',
       })
     } else {
       score += WEIGHTS.descriptionPresent

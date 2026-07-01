@@ -59,7 +59,7 @@ The score is the sum of points awarded by each check. Maximum: **100 points**. T
 | YAML frontmatter present and parseable | 16 | `yaml-frontmatter` |
 | `name` field present and non-empty | 16 | `name-present` |
 | `name` is kebab-case and uses no reserved words | 11 | `name-format` |
-| `description` field present | 16 | `description-length` |
+| `description` field present | 16 | `description-present` |
 | `description` meets 30-word minimum | 6 | `description-length` |
 | `description` ≤ 1024 chars and free of XML tags | 11 | `description-format` |
 | `SKILL.md` under 500 lines | 7 | `line-count` |
