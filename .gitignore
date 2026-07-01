@@ -6,3 +6,5 @@ coverage/
 .env.local
 .skilldex/
 SKILLSET_SPEC.md
+conformance_scoring_archive/
+The-Complete-Guide-to-Building-Skill-for-Claude.pdf
