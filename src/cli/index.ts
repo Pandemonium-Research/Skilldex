@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { createRequire } from 'node:module'
 import { registerInstall } from './commands/install.js'
 import { registerUninstall } from './commands/uninstall.js'
 import { registerList } from './commands/list.js'
@@ -10,13 +11,16 @@ import { registerSkillset } from './commands/skillset.js'
 import { registerUpdate } from './commands/update.js'
 import { registerConfig } from './commands/config.js'
 
+const require = createRequire(import.meta.url)
+const { version } = require('../../package.json') as { version: string }
+
 export function createCli(): Command {
   const program = new Command()
 
   program
     .name('skillpm')
     .description('Package manager for Claude skill packages')
-    .version('1.0.0')
+    .version(version)
     .option('--no-color', 'Disable colored output')
 
   registerInstall(program)
