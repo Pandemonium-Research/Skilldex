@@ -79,6 +79,53 @@ describe('validateSkill', () => {
     expect(result.diagnostics.some((d) => d.check === 'referenced-resources' && d.severity === 'error')).toBe(false)
   })
 
+  it('flags a name that is not kebab-case', async () => {
+    const result = await validateSkill(fixtures('bad-name-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'name-format')
+    expect(diag?.severity).toBe('error')
+    expect(diag?.message).toMatch(/kebab-case/)
+  })
+
+  it('flags a name containing a reserved word', async () => {
+    const result = await validateSkill(fixtures('reserved-name-skill'))
+    const diag = result.diagnostics.find(
+      (d) => d.check === 'name-format' && /reserved/.test(d.message)
+    )
+    expect(diag?.severity).toBe('error')
+    expect(diag?.message).toMatch(/claude/)
+  })
+
+  it('flags a description that exceeds the character limit', async () => {
+    const result = await validateSkill(fixtures('long-description-skill'))
+    const diag = result.diagnostics.find(
+      (d) => d.check === 'description-format' && /1024/.test(d.message)
+    )
+    expect(diag?.severity).toBe('error')
+  })
+
+  it('flags a description containing XML angle brackets', async () => {
+    const result = await validateSkill(fixtures('xml-description-skill'))
+    const diag = result.diagnostics.find(
+      (d) => d.check === 'description-format' && /angle bracket|XML/.test(d.message)
+    )
+    expect(diag?.severity).toBe('error')
+  })
+
+  it('warns when README.md is inside the skill folder', async () => {
+    const result = await validateSkill(fixtures('readme-in-folder-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'no-readme')
+    expect(diag?.severity).toBe('warning')
+    expect(diag?.message).toMatch(/README\.md/)
+  })
+
+  it('awards the new format checks on a fully valid skill', async () => {
+    const result = await validateSkill(fixtures('valid-skill'))
+    for (const check of ['name-format', 'description-format', 'no-readme']) {
+      const diag = result.diagnostics.find((d) => d.check === check)
+      expect(diag?.severity, check).toBe('pass')
+    }
+  })
+
   it('includes specVersion in result', async () => {
     const result = await validateSkill(fixtures('valid-skill'))
     expect(result.specVersion).toBe('1.0')

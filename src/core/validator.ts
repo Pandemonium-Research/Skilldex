@@ -9,17 +9,26 @@ const ALLOWED_SUBDIRS = new Set(['scripts', 'references', 'assets'])
 const MAX_LINES = 500
 const WARN_LINES = 400
 const MIN_DESCRIPTION_WORDS = 30
+const MAX_DESCRIPTION_CHARS = 1024
+// name must be kebab-case: lowercase letters/digits separated by single hyphens
+const KEBAB_CASE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+// "claude" and "anthropic" are reserved and cannot appear in a skill name
+const RESERVED_NAME_WORDS = ['claude', 'anthropic']
 
-// Scoring weights
+// Scoring weights — derived from a 2-axis spec rubric (mandate x failure impact),
+// normalized to 100. See docs/validation.md "How the weights were derived".
 const WEIGHTS = {
-  frontmatterParseable: 25,
-  namePresent: 10,
-  descriptionPresent: 10,
-  descriptionLength: 10,
-  lineCount: 15,
-  allowedSubdirs: 10,
-  referencedResourcesExist: 15,
-  bundledResourcesCorrect: 5,
+  frontmatterParseable: 16,
+  namePresent: 16,
+  nameFormat: 11,
+  descriptionPresent: 16,
+  descriptionLength: 6,
+  descriptionFormat: 11,
+  lineCount: 7,
+  allowedSubdirs: 4,
+  noReadme: 4,
+  referencedResourcesExist: 7,
+  bundledResourcesCorrect: 2,
 } as const
 
 export async function validateSkill(skillPath: string): Promise<ValidationResult> {
@@ -79,11 +88,13 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
       check: 'yaml-frontmatter',
     })
 
-    // --- Check: name present (10 pts) ---
-    if (!frontmatter.name || String(frontmatter.name).trim() === '') {
+    // --- Check: name present (16 pts) ---
+    const nameValue = frontmatter.name == null ? '' : String(frontmatter.name).trim()
+    const nameLine = findFieldLine(lines, 'name', frontmatterEndLine)
+    if (nameValue === '') {
       diagnostics.push({
         severity: 'error',
-        line: findFieldLine(lines, 'name', frontmatterEndLine),
+        line: nameLine,
         message: 'Required field "name" is missing or empty',
         check: 'name-present',
       })
@@ -94,23 +105,51 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
         message: 'name field present',
         check: 'name-present',
       })
+
+      // --- Check: name format — kebab-case + not reserved (11 pts) ---
+      const nameErrors: string[] = []
+      if (!KEBAB_CASE.test(nameValue)) {
+        nameErrors.push(
+          `name "${nameValue}" is not kebab-case — use lowercase letters, digits, and hyphens only`
+        )
+      }
+      const reserved = RESERVED_NAME_WORDS.find((w) => nameValue.toLowerCase().includes(w))
+      if (reserved) {
+        nameErrors.push(
+          `name contains reserved word "${reserved}" — "claude" and "anthropic" are reserved`
+        )
+      }
+      if (nameErrors.length > 0) {
+        for (const message of nameErrors) {
+          diagnostics.push({ severity: 'error', line: nameLine, message, check: 'name-format' })
+        }
+      } else {
+        score += WEIGHTS.nameFormat
+        diagnostics.push({
+          severity: 'pass',
+          message: 'name is kebab-case and uses no reserved words',
+          check: 'name-format',
+        })
+      }
     }
 
-    // --- Check: description present + length (20 pts total) ---
-    if (!frontmatter.description || String(frontmatter.description).trim() === '') {
+    // --- Check: description present + length + format ---
+    const descLine = findFieldLine(lines, 'description', frontmatterEndLine)
+    const descValue = frontmatter.description == null ? '' : String(frontmatter.description).trim()
+    if (descValue === '') {
       diagnostics.push({
         severity: 'error',
-        line: findFieldLine(lines, 'description', frontmatterEndLine),
+        line: descLine,
         message: 'Required field "description" is missing or empty',
         check: 'description-length',
       })
     } else {
       score += WEIGHTS.descriptionPresent
-      const wordCount = String(frontmatter.description).trim().split(/\s+/).length
+      const wordCount = descValue.split(/\s+/).length
       if (wordCount < MIN_DESCRIPTION_WORDS) {
         diagnostics.push({
           severity: 'error',
-          line: findFieldLine(lines, 'description', frontmatterEndLine),
+          line: descLine,
           message: `description too short (current: ${wordCount} words, recommended: ${MIN_DESCRIPTION_WORDS}+)`,
           check: 'description-length',
         })
@@ -120,6 +159,29 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
           severity: 'pass',
           message: `description meets length requirement (${wordCount} words)`,
           check: 'description-length',
+        })
+      }
+
+      // --- Check: description format — char limit + no XML tags (11 pts) ---
+      const descErrors: string[] = []
+      if (descValue.length > MAX_DESCRIPTION_CHARS) {
+        descErrors.push(
+          `description exceeds ${MAX_DESCRIPTION_CHARS} characters (current: ${descValue.length})`
+        )
+      }
+      if (/[<>]/.test(descValue)) {
+        descErrors.push('description contains XML angle brackets (< >) — not allowed in frontmatter')
+      }
+      if (descErrors.length > 0) {
+        for (const message of descErrors) {
+          diagnostics.push({ severity: 'error', line: descLine, message, check: 'description-format' })
+        }
+      } else {
+        score += WEIGHTS.descriptionFormat
+        diagnostics.push({
+          severity: 'pass',
+          message: 'description is within the character limit and free of XML tags',
+          check: 'description-format',
         })
       }
     }
@@ -148,7 +210,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     })
   }
 
-  // --- Check: allowed subdirectories (10 pts) ---
+  // --- Check: allowed subdirectories (4 pts) ---
   const subDirResult = await checkSubdirectories(absPath)
   if (subDirResult.unknownDirs.length > 0) {
     for (const dir of subDirResult.unknownDirs) {
@@ -159,7 +221,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
       })
     }
     // Partial credit: deduct per unknown dir but don't go below 0
-    const deduction = Math.min(WEIGHTS.allowedSubdirs, subDirResult.unknownDirs.length * 3)
+    const deduction = Math.min(WEIGHTS.allowedSubdirs, subDirResult.unknownDirs.length * 2)
     score += Math.max(0, WEIGHTS.allowedSubdirs - deduction)
   } else {
     score += WEIGHTS.allowedSubdirs
@@ -170,7 +232,23 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     })
   }
 
-  // --- Check: referenced resources exist (15 pts) ---
+  // --- Check: no README.md inside the skill folder (4 pts) ---
+  if (subDirResult.hasReadme) {
+    diagnostics.push({
+      severity: 'warning',
+      message: 'README.md should not be inside the skill folder — put docs in SKILL.md or references/',
+      check: 'no-readme',
+    })
+  } else {
+    score += WEIGHTS.noReadme
+    diagnostics.push({
+      severity: 'pass',
+      message: 'No README.md inside the skill folder',
+      check: 'no-readme',
+    })
+  }
+
+  // --- Check: referenced resources exist (7 pts) ---
   const brokenRefs = await checkBrokenReferences(content, absPath, lines)
   if (brokenRefs.length > 0) {
     for (const ref of brokenRefs) {
@@ -293,21 +371,25 @@ function findFieldLine(lines: string[], field: string, maxLine: number): number 
 
 interface SubdirResult {
   unknownDirs: string[]
+  hasReadme: boolean
 }
 
 async function checkSubdirectories(skillPath: string): Promise<SubdirResult> {
   const unknownDirs: string[] = []
+  let hasReadme = false
   try {
     const entries = await readdir(skillPath, { withFileTypes: true })
     for (const entry of entries) {
       if (entry.isDirectory() && !ALLOWED_SUBDIRS.has(entry.name)) {
         unknownDirs.push(entry.name)
+      } else if (entry.isFile() && entry.name.toLowerCase() === 'readme.md') {
+        hasReadme = true
       }
     }
   } catch {
     // ignore readdir errors
   }
-  return { unknownDirs }
+  return { unknownDirs, hasReadme }
 }
 
 interface BrokenRef {
