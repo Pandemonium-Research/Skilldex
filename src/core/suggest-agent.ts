@@ -69,13 +69,24 @@ export async function gatherProjectContext(projectRoot: string): Promise<string>
 export async function generateProposals(context: string): Promise<SuggestionProposal[]> {
   const { getConfigValue } = await import('./config.js')
   const apiKey = await getConfigValue('anthropicApiKey')
-  if (!apiKey) {
+  // Bearer-token auth for custom/proxy endpoints (e.g. a LiteLLM proxy).
+  const authToken = process.env.ANTHROPIC_AUTH_TOKEN
+  if (!apiKey && !authToken) {
     throw new Error(
-      'ANTHROPIC_API_KEY is required for the suggest command. Set it via environment variable or run: skillpm config set anthropicApiKey <key>'
+      'ANTHROPIC_API_KEY is required for the suggest command. Set it via environment variable or run: skillpm config set anthropicApiKey <key>. For a custom endpoint, set ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN.'
     )
   }
 
-  const client = new Anthropic({ apiKey })
+  // Optional overrides so suggest can run against an Anthropic-compatible proxy
+  // (defaults preserve first-party Anthropic behaviour).
+  const baseURL = process.env.ANTHROPIC_BASE_URL
+  const model = process.env.SKILLPM_SUGGEST_MODEL ?? 'claude-sonnet-4-6'
+
+  const client = new Anthropic({
+    ...(apiKey ? { apiKey } : {}),
+    ...(authToken ? { authToken } : {}),
+    ...(baseURL ? { baseURL } : {}),
+  })
 
   const systemPrompt = `You are a Claude skill recommender for the Skilldex package manager.
 Skills are Claude Code skill packages (SKILL.md files) that give Claude specialized capabilities.
@@ -100,7 +111,7 @@ Rules:
 - Keep reasons concise (one sentence)`
 
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model,
     max_tokens: 1024,
     messages: [
       {
