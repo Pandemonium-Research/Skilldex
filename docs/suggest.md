@@ -15,7 +15,39 @@ export ANTHROPIC_API_KEY=sk-ant-...
 skillpm suggest
 ```
 
-You can also store the key in `~/.skilldex/config.json` (not yet implemented — use the environment variable for now).
+You can also store the key in `~/.skilldex/config.json`:
+
+```bash
+skillpm config set anthropicApiKey sk-ant-...
+```
+
+The environment variable always wins over the config file. `suggest` is the only command that needs a key — everything else works offline.
+
+---
+
+## Custom Endpoints
+
+`suggest` uses the Anthropic SDK, so it can run against any endpoint that speaks the **Anthropic Messages API format** — for example a [LiteLLM](https://github.com/BerriAI/litellm) proxy. Through such a proxy you can front non-Claude models (including OpenAI models) while keeping the same request/response shape Skilldex expects.
+
+> **Note:** this is Anthropic Messages API compatibility, *not* OpenAI Chat Completions compatibility. Pointing `ANTHROPIC_BASE_URL` directly at a raw OpenAI-style endpoint (e.g. `api.openai.com/v1`) will not work — the endpoint must accept and return Anthropic-format messages. A translating proxy in between is what makes non-Claude models usable.
+
+Three environment variables control this (all optional; the defaults preserve first-party Anthropic behavior):
+
+| Environment variable | Description |
+|---|---|
+| `ANTHROPIC_BASE_URL` | Base URL of the Anthropic-compatible endpoint. |
+| `ANTHROPIC_AUTH_TOKEN` | Bearer-token auth for the endpoint. Used instead of `ANTHROPIC_API_KEY`; either one satisfies the credential requirement. |
+| `SKILLPM_SUGGEST_MODEL` | Model name to request. Defaults to `claude-sonnet-4-6`. |
+
+```bash
+# Example: route suggest through a LiteLLM proxy
+export ANTHROPIC_BASE_URL=https://litellm.internal.example.com
+export ANTHROPIC_AUTH_TOKEN=sk-proxy-...
+export SKILLPM_SUGGEST_MODEL=my-proxy-model-alias
+skillpm suggest
+```
+
+These also apply to the `skilldex_suggest` MCP tool — set them in the server's `env` block. See [mcp.md](mcp.md).
 
 ---
 
@@ -58,7 +90,7 @@ Claude is given the context and asked to return a structured list of skill propo
 }
 ```
 
-The model used is `claude-sonnet-4-6`. The system prompt instructs the model to:
+The model used is `claude-sonnet-4-6` by default, overridable with `SKILLPM_SUGGEST_MODEL` (see [Custom Endpoints](#custom-endpoints)). The system prompt instructs the model to:
 - Suggest 3–7 skills maximum
 - Default `suggestedScope` to `project` unless there's a clear reason for `global` or `shared`
 - Not re-suggest already-installed skills

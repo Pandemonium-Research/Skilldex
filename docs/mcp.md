@@ -1,6 +1,8 @@
 # MCP Server Integration
 
-Skilldex exposes a Model Context Protocol (MCP) server so Claude Code can invoke all package management operations directly — installing skills mid-session, listing what's available, validating skill quality, and generating suggestions.
+Skilldex exposes a Model Context Protocol (MCP) server so any MCP-capable coding agent can invoke all package management operations directly — installing skills mid-session, listing what's available, validating skill quality, and generating suggestions.
+
+The server is **agent-agnostic**. It communicates over stdio and speaks plain MCP, so Claude Code, Codex, Cursor, Windsurf, Zed, and any other MCP client all work the same way. All tools except `skilldex_suggest` are pure package-management operations (filesystem + registry) and call no LLM — their behavior is identical regardless of which agent invokes them. Only `skilldex_suggest` reaches an LLM, and only it needs an API key.
 
 ---
 
@@ -21,11 +23,11 @@ npm install && npm run build
 npm link
 ```
 
-### 2. Configure Claude Code
+### 2. Register the server with your agent
 
-Add the server to your MCP config. Claude Code looks for `.mcp.json` in the project root, or you can add it to the global `~/.claude/mcp.json`.
+The server is launched with `skillpm mcp` (a stdio server). Point your agent's MCP config at that command.
 
-**`.mcp.json` in your project root:**
+**Claude Code** — `.mcp.json` in the project root, or the global `~/.claude/mcp.json`:
 
 ```json
 {
@@ -38,7 +40,15 @@ Add the server to your MCP config. Claude Code looks for `.mcp.json` in the proj
 }
 ```
 
-The `ANTHROPIC_API_KEY` environment variable is only needed if you use the `skilldex_suggest` tool. Add it to the config if needed:
+**Codex** — `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.skilldex]
+command = "skillpm"
+args = ["mcp"]
+```
+
+The `ANTHROPIC_API_KEY` environment variable is only needed if you use the `skilldex_suggest` tool. Add it via the config's `env` block:
 
 ```json
 {
@@ -54,15 +64,25 @@ The `ANTHROPIC_API_KEY` environment variable is only needed if you use the `skil
 }
 ```
 
-### 3. Restart Claude Code
+```toml
+# Codex equivalent
+[mcp_servers.skilldex]
+command = "skillpm"
+args = ["mcp"]
+env = { ANTHROPIC_API_KEY = "sk-ant-..." }
+```
 
-After saving the config, restart Claude Code. The Skilldex tools will appear in the tool list.
+To point `skilldex_suggest` at a custom Anthropic-compatible endpoint instead, set `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and optionally `SKILLPM_SUGGEST_MODEL` in the same `env` block. See [suggest.md](suggest.md#custom-endpoints).
+
+### 3. Restart your agent
+
+After saving the config, restart the agent (or reload its MCP servers). The Skilldex tools will appear in the tool list.
 
 ---
 
 ## Transport
 
-The MCP server uses **`StdioServerTransport`** — it communicates over stdin/stdout, which is the standard for local Claude Code MCP servers. There is no HTTP server, no port, and no authentication needed.
+The MCP server uses **`StdioServerTransport`** — it communicates over stdin/stdout, the standard for local MCP servers. There is no HTTP server, no port, and no authentication needed.
 
 ---
 
@@ -228,7 +248,7 @@ Generate AI-powered skill suggestions based on project context.
 }
 ```
 
-**Requirements:** `ANTHROPIC_API_KEY` must be set in the server's environment (see setup above).
+**Requirements:** `ANTHROPIC_API_KEY` must be set in the server's environment (see setup above). Alternatively, point it at a custom Anthropic-compatible endpoint with `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` — see [suggest.md](suggest.md#custom-endpoints).
 
 **Example prompt to Claude Code:**
 > "Suggest skills I should install for this project based on the codebase."

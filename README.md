@@ -2,7 +2,7 @@
 
 **npm, but for Claude skills.**
 
-Skilldex is a package manager and registry for Claude `.skill` packages. It handles installation at the right scope, format validation with compiler-style feedback, quality scoring, and AI-powered skill suggestions — all while integrating natively with Claude Code via MCP.
+Skilldex is a package manager and registry for Claude `.skill` packages. It handles installation at the right scope, format validation with compiler-style feedback, quality scoring, and AI-powered skill suggestions — all while integrating natively with Claude Code, Codex, and any MCP-capable coding agent.
 
 ```bash
 skillpm install forensics-agent --scope project
@@ -25,7 +25,7 @@ skillpm list
 - [Agent Suggestion Loop](#agent-suggestion-loop)
 - [Skillsets](#skillsets)
 - [Configuration](#configuration)
-- [Claude Code Integration (MCP)](#claude-code-integration-mcp)
+- [Coding Agent Integration (MCP)](#coding-agent-integration-mcp)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 
@@ -179,6 +179,17 @@ skillpm suggest
 ```
 
 Skilldex reads your project context (README, package.json, `.claude/` directory) and proposes relevant skills. You approve, reject, or change the scope of each before installation.
+
+`suggest` can also run against a custom **Anthropic-compatible** endpoint (e.g. a LiteLLM proxy), which lets you front non-Claude models:
+
+```bash
+export ANTHROPIC_BASE_URL=https://your-proxy.example.com
+export ANTHROPIC_AUTH_TOKEN=...            # bearer-token auth for the proxy
+export SKILLPM_SUGGEST_MODEL=...           # optional; defaults to claude-sonnet-4-6
+skillpm suggest
+```
+
+The endpoint must speak the Anthropic Messages API format. See [docs/suggest.md](docs/suggest.md#custom-endpoints) for details.
 
 ---
 
@@ -384,22 +395,30 @@ skillpm config list
 | `anthropicApiKey` | `ANTHROPIC_API_KEY` | Anthropic API key for `suggest` |
 | `defaultScope` | `SKILLDEX_DEFAULT_SCOPE` | Default install scope (`global`, `shared`, or `project`) |
 
+**Environment-only overrides for `suggest`** (no config-file key; set these to target a custom Anthropic-compatible endpoint):
+
+| Environment variable | Description |
+|---|---|
+| `ANTHROPIC_BASE_URL` | Base URL of an Anthropic-compatible endpoint (e.g. a LiteLLM proxy). Defaults to the first-party Anthropic API. |
+| `ANTHROPIC_AUTH_TOKEN` | Bearer-token auth for the custom endpoint (used in place of `ANTHROPIC_API_KEY`). |
+| `SKILLPM_SUGGEST_MODEL` | Model name to request. Defaults to `claude-sonnet-4-6`. |
+
 ---
 
-## Claude Code Integration (MCP)
+## Coding Agent Integration (MCP)
 
 Full reference: [docs/mcp.md](docs/mcp.md)
 
-Skilldex exposes a Model Context Protocol (MCP) server so Claude Code can invoke all operations directly.
+Skilldex exposes a Model Context Protocol (MCP) server so any MCP-capable coding agent — Claude Code, Codex, Cursor, Windsurf, Zed, and others — can invoke all operations directly. The server communicates over stdio and is agent-agnostic: the install, uninstall, list, validate, search, and skillset tools call no LLM at all, so they behave identically no matter which agent drives them. Only `skilldex_suggest` needs an API key.
 
-**Add to your Claude Code MCP config** (`.mcp.json` in project root or `~/.claude/mcp.json`):
+**Claude Code** (`.mcp.json` in project root or `~/.claude/mcp.json`):
 
 ```json
 {
   "mcpServers": {
     "skilldex": {
-      "command": "node",
-      "args": ["/absolute/path/to/Skilldex/dist/mcp/server.js"],
+      "command": "skillpm",
+      "args": ["mcp"],
       "env": {
         "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
       }
@@ -408,7 +427,18 @@ Skilldex exposes a Model Context Protocol (MCP) server so Claude Code can invoke
 }
 ```
 
-Once configured, Claude Code can:
+**Codex** (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.skilldex]
+command = "skillpm"
+args = ["mcp"]
+env = { ANTHROPIC_API_KEY = "sk-ant-..." }
+```
+
+Any other MCP client works the same way: run `skillpm mcp` as a stdio server. The `env` block is only required if you plan to use `skilldex_suggest`.
+
+Once configured, your agent can:
 - Call `skilldex_install` to install a skill mid-session
 - Call `skilldex_list` to see what's available
 - Call `skilldex_validate` to check a skill's format score
@@ -424,6 +454,10 @@ Once configured, Claude Code can:
 | `skilldex_validate` | Validate and score a skill |
 | `skilldex_suggest` | Generate skill suggestions |
 | `skilldex_search` | Search the registry |
+| `skilldex_skillset_install` | Install a skillset from path, git URL, or registry name |
+| `skilldex_skillset_uninstall` | Remove a skillset and its skills |
+| `skilldex_skillset_list` | List installed skillsets |
+| `skilldex_skillset_validate` | Validate and score a skillset |
 
 ---
 
