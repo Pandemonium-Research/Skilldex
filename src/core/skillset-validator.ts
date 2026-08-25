@@ -2,9 +2,15 @@ import { readFile, stat, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { parseDocument } from 'yaml'
 import type { ValidationDiagnostic } from '../types/skill.js'
-import type { SkillsetFrontmatter, SkillsetValidationResult, RemoteSkillRef } from '../types/skillset.js'
+import type {
+  SkillsetFrontmatter,
+  SkillsetValidationResult,
+  SkillsetCoherenceResult,
+  RemoteSkillRef,
+} from '../types/skillset.js'
+import { checkSkillsetCoherence } from './skillset-coherence.js'
 
-export const SKILLSET_SPEC_VERSION = '1.0'
+export const SKILLSET_SPEC_VERSION = '1.1'
 const SKILLSET_MD = 'SKILLSET.md'
 const MIN_DESCRIPTION_WORDS = 30
 
@@ -65,6 +71,7 @@ export async function validateSkillset(skillsetPath: string): Promise<SkillsetVa
       passCount: 0,
       warnCount: 0,
       errorCount: 1,
+      coherence: emptyCoherence(),
     }
   }
 
@@ -177,6 +184,12 @@ export async function validateSkillset(skillsetPath: string): Promise<SkillsetVa
 
   score = Math.min(100, Math.max(0, Math.round(score)))
 
+  // Coherence is reported as an independent dimension and deliberately does not move `score`.
+  // Structural conformance answers "is this skillset well-formed"; coherence answers "do its
+  // members agree with each other". Folding the second into the first would let a high aggregate
+  // hide a contradiction, which is the failure mode the split exists to prevent.
+  const coherence = await checkSkillsetCoherence(absPath, embeddedSkills)
+
   return {
     skillset: path.basename(absPath),
     score,
@@ -187,6 +200,7 @@ export async function validateSkillset(skillsetPath: string): Promise<SkillsetVa
     passCount: diagnostics.filter((d) => d.severity === 'pass').length,
     warnCount: diagnostics.filter((d) => d.severity === 'warning').length,
     errorCount: diagnostics.filter((d) => d.severity === 'error').length,
+    coherence,
   }
 }
 
@@ -203,6 +217,20 @@ function fatal(skillsetPath: string, message: string): SkillsetValidationResult 
     passCount: 0,
     warnCount: 0,
     errorCount: 1,
+    coherence: emptyCoherence(),
+  }
+}
+
+/** Nothing to check when the skillset could not be read far enough to find its members. */
+function emptyCoherence(): SkillsetCoherenceResult {
+  return {
+    declaredConventions: [],
+    diagnostics: [],
+    membersChecked: 0,
+    membersCoherent: 0,
+    passCount: 0,
+    warnCount: 0,
+    errorCount: 0,
   }
 }
 

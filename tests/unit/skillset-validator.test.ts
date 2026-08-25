@@ -71,7 +71,7 @@ describe('validateSkillset', () => {
 
   it('includes specVersion in result', async () => {
     const result = await validateSkillset(fixtures('valid-skillset'))
-    expect(result.specVersion).toBe('1.0')
+    expect(result.specVersion).toBe('1.1')
   })
 
   it('counts pass/warn/error correctly', async () => {
