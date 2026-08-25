@@ -49,7 +49,8 @@ export function registerSkillset(program: Command): void {
     .command('validate [path]')
     .description('Validate a skillset directory structure and score SKILLSET.md')
     .option('--json', 'Output as JSON')
-    .action(async (skillsetPath: string | undefined, options: { json: boolean }) => {
+    .option('--strict', 'Fail when a member contradicts a declared shared convention', false)
+    .action(async (skillsetPath: string | undefined, options: { json: boolean; strict: boolean }) => {
       const { runSkillsetValidate } = await import('./skillset-validate-action.js')
       await runSkillsetValidate(skillsetPath ?? process.cwd(), options)
     })
