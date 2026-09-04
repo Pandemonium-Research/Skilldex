@@ -90,8 +90,7 @@ describe('runUpdate', () => {
 
     expect(mocks.installFromGitUrl).toHaveBeenCalledWith(
       `git+${skill.sourceUrl}`,
-      expect.objectContaining({ level: 'project' }),
-      expect.objectContaining({ force: true, sourceUrl: skill.sourceUrl })
+      expect.objectContaining({ scope: 'project', force: true, sourceUrl: skill.sourceUrl })
     )
 
     consoleSpy.mockRestore()

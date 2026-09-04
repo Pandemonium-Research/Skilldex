@@ -77,15 +77,7 @@ describe('installFromGitUrl — real clone, real install', () => {
     const repo = await makeSkillRepo(tmpRoot, ['solo-skill'])
     const { installFromGitUrl } = await import('../../src/registry/sources/github.js')
 
-    const scopeConfig = {
-      level: 'project' as const,
-      rootPath: path.join(tmpRoot, 'scope', 'project'),
-      manifestPath: path.join(tmpRoot, 'scope', 'project', 'skilldex.json'),
-      skillsDir: path.join(tmpRoot, 'scope', 'project', 'skills'),
-      skillsetsDir: path.join(tmpRoot, 'scope', 'project', 'skillsets'),
-    }
-
-    const result = await installFromGitUrl(`file://${repo}`, scopeConfig, { scope: 'project' })
+    const result = await installFromGitUrl(`file://${repo}`, { scope: 'project' })
 
     expect(result.skillName).toBe('solo-skill')
 
@@ -102,15 +94,7 @@ describe('installFromGitUrl — real clone, real install', () => {
     const repo = await makeSkillRepo(tmpRoot, ['alpha-skill', 'beta-skill'])
     const { installFromGitUrl } = await import('../../src/registry/sources/github.js')
 
-    const scopeConfig = {
-      level: 'project' as const,
-      rootPath: path.join(tmpRoot, 'scope', 'project'),
-      manifestPath: path.join(tmpRoot, 'scope', 'project', 'skilldex.json'),
-      skillsDir: path.join(tmpRoot, 'scope', 'project', 'skills'),
-      skillsetsDir: path.join(tmpRoot, 'scope', 'project', 'skillsets'),
-    }
-
-    const result = await installFromGitUrl(`file://${repo}`, scopeConfig, {
+    const result = await installFromGitUrl(`file://${repo}`, {
       scope: 'project',
       onMultipleSkills: async () => 'beta-skill',
     })

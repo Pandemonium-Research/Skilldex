@@ -44,7 +44,7 @@ export async function runUpdate(
 
     try {
       const { installFromGitUrl } = await import('../../registry/sources/github.js')
-      const result = await installFromGitUrl(`git+${skill.sourceUrl}`, scopeConfig, {
+      const result = await installFromGitUrl(`git+${skill.sourceUrl}`, {
         scope: options.scope,
         force: true,
         sourceUrl: skill.sourceUrl,

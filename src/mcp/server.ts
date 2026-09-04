@@ -42,8 +42,7 @@ export async function startMcpServer(): Promise<void> {
     async ({ source, scope, force }) => {
       let result
       if (source.startsWith('git+')) {
-        const scopeConfig = await resolveScope(scope)
-        result = await installFromGitUrl(source, scopeConfig, { scope, force, sourceUrl: source })
+        result = await installFromGitUrl(source, { scope, force, sourceUrl: source })
       } else {
         result = await installFromPath(source, { scope, force })
       }

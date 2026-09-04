@@ -2,7 +2,6 @@ import { mkdtemp, rm, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { simpleGit } from 'simple-git'
-import type { ScopeConfig } from '../../types/scope.js'
 import type { InstallOptions, InstallResult } from '../../core/installer.js'
 import { installFromPath } from '../../core/installer.js'
 
@@ -31,7 +30,6 @@ export function parseGitUrl(raw: string): ParsedGitUrl {
 
 export async function installFromGitUrl(
   rawUrl: string,
-  targetScopeConfig: ScopeConfig,
   options: InstallOptions
 ): Promise<InstallResult> {
   const parsed = parseGitUrl(rawUrl)

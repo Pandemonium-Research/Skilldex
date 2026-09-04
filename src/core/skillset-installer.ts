@@ -85,7 +85,7 @@ export async function installSkillsetFromPath(
   const remoteResults: InstallResult[] = []
   for (const ref of validation.remoteSkills) {
     const { installFromGitUrl } = await import('../registry/sources/github.js')
-    const result = await installFromGitUrl(`git+${ref.source_url}`, scopeConfig, {
+    const result = await installFromGitUrl(`git+${ref.source_url}`, {
       scope: options.scope,
       force: options.force,
       sourceUrl: ref.source_url,

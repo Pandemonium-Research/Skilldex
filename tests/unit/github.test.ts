@@ -87,17 +87,9 @@ describe('installFromGitUrl — onMultipleSkills callback', () => {
   it('calls onMultipleSkills with all found skill folder names', async () => {
     const { installFromGitUrl } = await import('../../src/registry/sources/github.js')
 
-    const scopeConfig = {
-      level: 'project' as const,
-      rootPath: tmpScope,
-      manifestPath: path.join(tmpScope, 'skilldex.json'),
-      skillsDir: path.join(tmpScope, 'skills'),
-      skillsetsDir: path.join(tmpScope, 'skillsets'),
-    }
-
     const onMultipleSkills = vi.fn(async (names: string[]) => names[0])
 
-    await installFromGitUrl('git+https://github.com/user/repo', scopeConfig, {
+    await installFromGitUrl('git+https://github.com/user/repo', {
       scope: 'project',
       onMultipleSkills,
     })
@@ -111,15 +103,7 @@ describe('installFromGitUrl — onMultipleSkills callback', () => {
   it('auto-selects first skill when no onMultipleSkills callback provided', async () => {
     const { installFromGitUrl } = await import('../../src/registry/sources/github.js')
 
-    const scopeConfig = {
-      level: 'project' as const,
-      rootPath: tmpScope,
-      manifestPath: path.join(tmpScope, 'skilldex.json'),
-      skillsDir: path.join(tmpScope, 'skills'),
-      skillsetsDir: path.join(tmpScope, 'skillsets'),
-    }
-
-    await installFromGitUrl('git+https://github.com/user/repo', scopeConfig, {
+    await installFromGitUrl('git+https://github.com/user/repo', {
       scope: 'project',
       // no onMultipleSkills
     })

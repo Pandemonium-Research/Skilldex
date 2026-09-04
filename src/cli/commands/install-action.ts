@@ -71,9 +71,7 @@ async function runRegistryInstall(
     if (spinner) spinner.text = `Installing "${name}" from ${info.source_url}...`
 
     const { installFromGitUrl } = await import('../../registry/sources/github.js')
-    const { resolveScope } = await import('../../core/resolver.js')
-    const scopeConfig = await resolveScope(options.scope)
-    const result = await installFromGitUrl(`git+${info.source_url}`, scopeConfig, {
+    const result = await installFromGitUrl(`git+${info.source_url}`, {
       scope: options.scope,
       force: options.force,
       sourceUrl: info.source_url,
@@ -120,9 +118,7 @@ async function runGitInstall(
   const spinner = options.json ? null : ora(`Cloning ${gitUrl}...`).start()
   try {
     const { installFromGitUrl } = await import('../../registry/sources/github.js')
-    const { resolveScope } = await import('../../core/resolver.js')
-    const scopeConfig = await resolveScope(options.scope)
-    const result = await installFromGitUrl(gitUrl, scopeConfig, {
+    const result = await installFromGitUrl(gitUrl, {
       scope: options.scope,
       force: options.force,
       sourceUrl: gitUrl,
