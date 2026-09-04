@@ -74,7 +74,9 @@ async function registryFetch<T>(path: string, options?: RequestInit): Promise<T>
     try {
       const body = (await res.json()) as { error?: string }
       if (body.error) message = body.error
-    } catch {}
+    } catch {
+      // Body was not JSON — keep the status-code message.
+    }
     throw new Error(message)
   }
 

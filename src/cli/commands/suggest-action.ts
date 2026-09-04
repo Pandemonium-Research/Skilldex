@@ -2,7 +2,7 @@ import ora from 'ora'
 import chalk from 'chalk'
 import { gatherProjectContext, generateProposals } from '../../core/suggest-agent.js'
 import { findProjectRoot } from '../../core/resolver.js'
-import { printJson, printError, printSuccess } from '../ui/output.js'
+import { printJson, printError } from '../ui/output.js'
 
 export async function runSuggest(options: {
   projectPath?: string
@@ -42,7 +42,6 @@ export async function runSuggest(options: {
     }
 
     console.log(`\nInstalling ${approved.length} skill(s)...`)
-    const { installFromPath } = await import('../../core/installer.js')
 
     const installed: string[] = []
     for (const { proposal, scope } of approved) {

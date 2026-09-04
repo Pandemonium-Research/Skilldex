@@ -1,8 +1,7 @@
 import ora from 'ora'
-import chalk from 'chalk'
 import type { ScopeLevel } from '../../types/scope.js'
 import type { InstalledSkill } from '../../types/manifest.js'
-import { resolveScope, resolveAllScopes } from '../../core/resolver.js'
+import { resolveScope } from '../../core/resolver.js'
 import { readManifest } from '../../core/manifest.js'
 import { printJson, printError, printSuccess, printWarning, printInfo } from '../ui/output.js'
 

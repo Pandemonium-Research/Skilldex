@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'

@@ -17,7 +17,7 @@ function scoreLabel(score: number | null): string {
   return chalk.red(`${score}/100`)
 }
 
-function renderSkillCard(skill: RegistrySkill, index: number): void {
+function renderSkillCard(skill: RegistrySkill, _index: number): void {
   console.log(`\n${chalk.bold(skill.name)} ${tierBadge(skill.trust_tier)}`)
   console.log(`  ${skill.description}`)
   console.log(

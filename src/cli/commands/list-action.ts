@@ -3,7 +3,7 @@ import type { ScopeLevel } from '../../types/scope.js'
 import type { SkillManifest } from '../../types/manifest.js'
 import { resolveAllScopes, resolveScope } from '../../core/resolver.js'
 import { readManifest } from '../../core/manifest.js'
-import { printJson, printError, printWarning } from '../ui/output.js'
+import { printJson, printError } from '../ui/output.js'
 import { SPEC_VERSION } from '../../core/validator.js'
 
 export async function runList(options: { scope?: ScopeLevel; json: boolean }): Promise<void> {

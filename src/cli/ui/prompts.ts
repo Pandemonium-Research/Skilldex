@@ -1,4 +1,4 @@
-import { select, confirm, input } from '@inquirer/prompts'
+import { select } from '@inquirer/prompts'
 import chalk from 'chalk'
 import type { SuggestionProposal } from '../../core/suggest-agent.js'
 import type { ScopeLevel } from '../../types/scope.js'

@@ -1,7 +1,7 @@
 import ora from 'ora'
 import type { ScopeLevel } from '../../types/scope.js'
 import { uninstallSkill } from '../../core/installer.js'
-import { printJson, printError, printSuccess } from '../ui/output.js'
+import { printJson, printError } from '../ui/output.js'
 
 export async function runUninstall(
   skillName: string,

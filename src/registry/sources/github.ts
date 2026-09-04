@@ -13,7 +13,7 @@ export interface ParsedGitUrl {
 
 export function parseGitUrl(raw: string): ParsedGitUrl {
   // Remove git+ prefix
-  let url = raw.replace(/^git\+/, '')
+  const url = raw.replace(/^git\+/, '')
 
   // Handle tree/branch/path syntax: https://github.com/user/repo/tree/branch/path
   const treeMatch = url.match(/^(https?:\/\/[^/]+\/[^/]+\/[^/]+)\/tree\/([^/]+)(\/.*)?$/)
