@@ -7,8 +7,9 @@ export function registerInstall(program: Command): void {
     .description('Install a skill from a local path, git URL, or registry')
     .option('-s, --scope <scope>', 'Installation scope: global, shared, or project', 'project')
     .option('-f, --force', 'Overwrite if already installed', false)
+    .option('--no-bridge', 'Do not link the skill into harness directories (.agents/skills, .claude/skills)')
     .option('--json', 'Output as JSON')
-    .action(async (source: string, options: { scope: ScopeLevel; force: boolean; json: boolean }) => {
+    .action(async (source: string, options: { scope: ScopeLevel; force: boolean; json: boolean; bridge: boolean }) => {
       const { getConfigValue } = await import('../../core/config.js')
       const defaultScope = (await getConfigValue('defaultScope')) ?? 'project'
       const scope = options.scope ?? defaultScope

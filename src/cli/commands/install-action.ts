@@ -1,7 +1,7 @@
 import ora from 'ora'
 import type { ScopeLevel } from '../../types/scope.js'
-import { installFromPath } from '../../core/installer.js'
-import { printValidationReport, printJson, printError, printSuccess } from '../ui/output.js'
+import { installFromPath, type InstallResult } from '../../core/installer.js'
+import { printValidationReport, printJson, printError, printSuccess, printWarning, printInfo } from '../ui/output.js'
 
 function isRegistryName(source: string): boolean {
   // A plain skill name: no path separators, no git+, no protocol, no dots suggesting a path
@@ -9,9 +9,24 @@ function isRegistryName(source: string): boolean {
     !source.startsWith('../') && !source.includes('://') && !source.endsWith('.md')
 }
 
+/**
+ * An install that did not bridge is invisible to every agent, so say what happened.
+ * Linked paths are informational; a conflict is a warning, because that harness will not
+ * see this skill until the user resolves it.
+ */
+function reportBridging(bridged: InstallResult['bridged']): void {
+  for (const link of bridged) {
+    if (link.linked) {
+      printInfo(`Linked into ${link.target}`)
+    } else {
+      printWarning(`Not linked: ${link.target} — ${link.conflict}`)
+    }
+  }
+}
+
 export async function runInstall(
   source: string,
-  options: { scope: ScopeLevel; force: boolean; json: boolean }
+  options: { scope: ScopeLevel; force: boolean; json: boolean; bridge?: boolean }
 ): Promise<void> {
   const isGitUrl = source.startsWith('git+')
 
@@ -32,6 +47,7 @@ export async function runInstall(
     const result = await installFromPath(source, {
       scope: options.scope,
       force: options.force,
+      bridge: options.bridge,
     })
 
     if (spinner) spinner.succeed(`Installed "${result.skillName}" at ${result.scope} scope`)
@@ -43,6 +59,7 @@ export async function runInstall(
         scope: result.scope,
         score: result.validation.score,
         diagnostics: result.validation.diagnostics,
+        bridged: result.bridged,
       })
     } else {
       if (result.validation.warnCount > 0 || result.validation.errorCount > 0) {
@@ -52,6 +69,8 @@ export async function runInstall(
         printSuccess(`Score: ${result.validation.score}/100`)
       }
     }
+
+    reportBridging(result.bridged)
   } catch (e) {
     if (spinner) spinner.fail()
     printError(e instanceof Error ? e.message : String(e))
@@ -61,7 +80,7 @@ export async function runInstall(
 
 async function runRegistryInstall(
   name: string,
-  options: { scope: ScopeLevel; force: boolean; json: boolean }
+  options: { scope: ScopeLevel; force: boolean; json: boolean; bridge?: boolean }
 ): Promise<void> {
   const spinner = options.json ? null : ora(`Looking up "${name}" in registry...`).start()
   try {
@@ -74,6 +93,7 @@ async function runRegistryInstall(
     const result = await installFromGitUrl(`git+${info.source_url}`, {
       scope: options.scope,
       force: options.force,
+      bridge: options.bridge,
       sourceUrl: info.source_url,
       onMultipleSkills: async (names) => {
         if (spinner) spinner.stop()
@@ -94,6 +114,7 @@ async function runRegistryInstall(
         scope: result.scope,
         score: result.validation.score,
         diagnostics: result.validation.diagnostics,
+        bridged: result.bridged,
         trust_tier: info.trust_tier,
       })
     } else {
@@ -104,6 +125,8 @@ async function runRegistryInstall(
         printSuccess(`Score: ${result.validation.score}/100 · Trust: ${info.trust_tier}`)
       }
     }
+
+    reportBridging(result.bridged)
   } catch (e) {
     if (spinner) spinner.fail()
     printError(e instanceof Error ? e.message : String(e))
@@ -113,7 +136,7 @@ async function runRegistryInstall(
 
 async function runGitInstall(
   gitUrl: string,
-  options: { scope: ScopeLevel; force: boolean; json: boolean }
+  options: { scope: ScopeLevel; force: boolean; json: boolean; bridge?: boolean }
 ): Promise<void> {
   const spinner = options.json ? null : ora(`Cloning ${gitUrl}...`).start()
   try {
@@ -121,6 +144,7 @@ async function runGitInstall(
     const result = await installFromGitUrl(gitUrl, {
       scope: options.scope,
       force: options.force,
+      bridge: options.bridge,
       sourceUrl: gitUrl,
       onMultipleSkills: async (names) => {
         if (spinner) spinner.stop()
@@ -141,6 +165,7 @@ async function runGitInstall(
         scope: result.scope,
         score: result.validation.score,
         diagnostics: result.validation.diagnostics,
+        bridged: result.bridged,
       })
     } else {
       if (result.validation.warnCount > 0 || result.validation.errorCount > 0) {
@@ -150,6 +175,8 @@ async function runGitInstall(
         printSuccess(`Score: ${result.validation.score}/100`)
       }
     }
+
+    reportBridging(result.bridged)
   } catch (e) {
     if (spinner) spinner.fail()
     printError(e instanceof Error ? e.message : String(e))

@@ -6,6 +6,7 @@ import type { ValidationResult } from '../types/skill.js'
 import { validateSkill, SPEC_VERSION } from './validator.js'
 import { resolveScope, resolveAllScopes } from './resolver.js'
 import { addSkillToManifest, removeSkillFromManifest, readManifest } from './manifest.js'
+import { bridgeSkill, unbridgeSkill, type BridgeLink } from './harness-bridge.js'
 
 export interface InstallOptions {
   scope: ScopeLevel
@@ -14,6 +15,8 @@ export interface InstallOptions {
   sourceUrl?: string
   /** Called when a repo contains multiple skill folders. Return the name of the folder to install. */
   onMultipleSkills?: (names: string[]) => Promise<string>
+  /** Link the skill into the harness directories for its scope. Default true. */
+  bridge?: boolean
 }
 
 export interface InstallResult {
@@ -22,6 +25,8 @@ export interface InstallResult {
   installedPath: string
   validation: ValidationResult
   alreadyExisted: boolean
+  /** Harness directories linked, and any left alone because something else owned them. */
+  bridged: BridgeLink[]
 }
 
 export async function installFromPath(
@@ -80,13 +85,27 @@ export async function installFromPath(
     await addSkillToManifest(scopeConfig, installed)
   }
 
+  // Bridging is what makes an install visible to an agent: `.skilldex/` is ours alone, and
+  // no harness reads it. Do it after the manifest write so nothing is ever linked before it
+  // is really installed.
+  let bridged: BridgeLink[] = []
+  if (!options.dryRun && options.bridge !== false) {
+    bridged = await bridgeSkill(skillName, targetDir, options.scope, projectRootFor(scopeConfig))
+  }
+
   return {
     skillName,
     scope: options.scope,
     installedPath: targetDir,
     validation,
     alreadyExisted,
+    bridged,
   }
+}
+
+/** For project scope, `rootPath` is `<projectRoot>/.skilldex`; other scopes ignore this. */
+function projectRootFor(scopeConfig: { rootPath: string }): string {
+  return path.dirname(scopeConfig.rootPath)
 }
 
 export async function uninstallSkill(skillName: string, scope: ScopeLevel): Promise<void> {
@@ -98,6 +117,10 @@ export async function uninstallSkill(skillName: string, scope: ScopeLevel): Prom
   }
 
   const skillDir = path.join(scopeConfig.skillsDir, skillName)
+
+  // Unlink before removing the target, so the check that a link is ours can still resolve it.
+  await unbridgeSkill(skillName, skillDir, scope, projectRootFor(scopeConfig))
+
   await rm(skillDir, { recursive: true, force: true })
   await removeSkillFromManifest(scopeConfig, skillName)
 }
