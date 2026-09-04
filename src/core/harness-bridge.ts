@@ -1,4 +1,4 @@
-import { mkdir, symlink, lstat, readlink, rm, cp, realpath } from 'node:fs/promises'
+import { mkdir, symlink, lstat, readlink, rm, cp, realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import type { ScopeLevel } from '../types/scope.js'
@@ -27,6 +27,13 @@ import type { ScopeLevel } from '../types/scope.js'
 export interface BridgeTarget {
   dir: string
   readers: string
+  /**
+   * When set, link here only if this directory already exists — i.e. the harness is actually
+   * installed. Vendor-private paths carry this so that installing a skill does not scatter
+   * `~/.qwen/skills` and `~/.cline/skills` across the machine of someone who uses neither.
+   * The two shared conventions have no guard: they are the agreed cross-tool location.
+   */
+  requires?: string
 }
 
 export interface BridgeLink {
@@ -45,10 +52,47 @@ const CLAUDE_READERS = 'Claude Code, Cursor, Copilot, Cline, OpenCode, Amp, Crus
  */
 export function bridgeTargets(scope: ScopeLevel, projectRoot: string): BridgeTarget[] {
   const base = scope === 'project' ? projectRoot : os.homedir()
-  return [
-    { dir: path.join(base, '.agents', 'skills'), readers: AGENTS_READERS },
-    { dir: path.join(base, '.claude', 'skills'), readers: CLAUDE_READERS },
+  const j = (...parts: string[]) => path.join(base, ...parts)
+
+  const targets: BridgeTarget[] = [
+    { dir: j('.agents', 'skills'), readers: AGENTS_READERS },
+    { dir: j('.claude', 'skills'), readers: CLAUDE_READERS },
   ]
+
+  // Harnesses that read neither shared convention at this tier. Guarded on the harness's own
+  // config directory, so they cost nothing for users who do not have that harness.
+  if (scope === 'project') {
+    targets.push({ dir: j('.qwen', 'skills'), readers: 'Qwen Code', requires: j('.qwen') })
+  } else {
+    targets.push(
+      { dir: j('.qwen', 'skills'), readers: 'Qwen Code', requires: j('.qwen') },
+      { dir: j('.cline', 'skills'), readers: 'Cline', requires: j('.cline') },
+      // Antigravity reads ~/.gemini/config/skills; ~/.gemini is shared with Gemini CLI, and its
+      // presence means one of the two is installed.
+      { dir: j('.gemini', 'config', 'skills'), readers: 'Antigravity', requires: j('.gemini') }
+    )
+  }
+
+  return targets
+}
+
+/** The subset of {@link bridgeTargets} whose guard is satisfied on this machine. */
+export async function applicableTargets(
+  scope: ScopeLevel,
+  projectRoot: string
+): Promise<BridgeTarget[]> {
+  const targets = bridgeTargets(scope, projectRoot)
+  const keep = await Promise.all(
+    targets.map(async (t) => {
+      if (!t.requires) return true
+      try {
+        return (await stat(t.requires)).isDirectory()
+      } catch {
+        return false
+      }
+    })
+  )
+  return targets.filter((_, i) => keep[i])
 }
 
 /** Does `entry` already point at `source`? Only then is it ours to replace or remove. */
@@ -83,7 +127,7 @@ export async function bridgeSkill(
 ): Promise<BridgeLink[]> {
   const results: BridgeLink[] = []
 
-  for (const { dir } of bridgeTargets(scope, projectRoot)) {
+  for (const { dir } of await applicableTargets(scope, projectRoot)) {
     const link = path.join(dir, skillName)
 
     if (await pointsAt(link, installedPath)) {
@@ -135,6 +179,8 @@ export async function unbridgeSkill(
 ): Promise<string[]> {
   const removed: string[] = []
 
+  // Every candidate, not just the applicable ones: a guard may have gone false since install
+  // (the harness was removed), and a link we created must still be ours to clean up.
   for (const { dir } of bridgeTargets(scope, projectRoot)) {
     const link = path.join(dir, skillName)
     if (await pointsAt(link, installedPath)) {
