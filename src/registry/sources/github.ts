@@ -53,7 +53,9 @@ export async function installFromGitUrl(
 
     // If exactly one skill found, install it directly
     if (skillFolders.length === 1) {
-      return installFromPath(skillFolders[0], { ...options, sourceUrl: rawUrl })
+      // `await` is load-bearing: `finally` below removes the clone, and a bare `return` of the
+      // promise lets that cleanup run before the copy has finished reading from it.
+      return await installFromPath(skillFolders[0], { ...options, sourceUrl: rawUrl })
     }
 
     // Multiple skills found — prompt if interactive callback provided, else pick first
@@ -65,7 +67,7 @@ export async function installFromGitUrl(
       selectedName = names[0]
     }
     const selectedFolder = skillFolders.find(f => path.basename(f) === selectedName) ?? skillFolders[0]
-    return installFromPath(selectedFolder, { ...options, sourceUrl: rawUrl })
+    return await installFromPath(selectedFolder, { ...options, sourceUrl: rawUrl })
   } finally {
     await rm(tmpDir, { recursive: true, force: true })
   }
