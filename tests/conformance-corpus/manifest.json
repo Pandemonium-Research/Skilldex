@@ -1,0 +1,229 @@
+{
+  "formatVersion": 1,
+  "generatedBy": "skilldex tests/conformance-corpus/generate.ts",
+  "note": "Expected scores are produced by skilldex, the reference implementation. skilldex-registry vendors this file and must reproduce every expectedScore. Coherence is recorded for reference only — the registry does not compute it.",
+  "skills": [
+    {
+      "id": "anchored-ref-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: anchored-ref-skill\ndescription: This skill references a missing file using a markdown link with a fragment anchor. The validator should strip the anchor and flag the missing file as a broken reference.\nversion: 1.0.0\n---\n\n## Instructions\n\nSee the [setup guide](references/missing.md#setup) before continuing.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 87
+    },
+    {
+      "id": "bad-name-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: Bad Name\ndescription: This skill has a name that uses spaces and capital letters instead of kebab-case, so the validator should flag the name format as non-conformant while every other check in the report stays perfectly valid and passing.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis fixture exercises the kebab-case name-format check.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 89
+    },
+    {
+      "id": "bad-structure-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: bad-structure-skill\ndescription: This skill has an unauthorized subdirectory in its folder structure which should trigger a warning from the validator.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis skill has a bad directory structure — it has a bin/ directory which is not allowed.\n",
+      "files": [
+        "bin/run.sh",
+        "SKILL.md"
+      ],
+      "expectedScore": 92
+    },
+    {
+      "id": "broken-ref-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: broken-ref-skill\ndescription: This skill references a file that does not exist. The validator should catch this as an error and deduct points from the score accordingly.\nversion: 1.0.0\n---\n\n## Instructions\n\nSee [the template](assets/template.docx) for more information.\n\nAlso check scripts/setup.sh for setup.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 87
+    },
+    {
+      "id": "inline-ref-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: inline-ref-skill\ndescription: This skill references a bundled resource using inline-code style, the canonical form from the skill guide. The referenced file is missing so the validator should flag it.\nversion: 1.0.0\n---\n\n## Instructions\n\nBefore writing queries, consult `references/missing.md` for guidance.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 87
+    },
+    {
+      "id": "inline-ref-valid-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: inline-ref-valid-skill\ndescription: This skill references a bundled resource using inline-code style, and that referenced file exists in the package. The validator should treat referenced resources as passing.\nversion: 1.0.0\n---\n\n## Instructions\n\nBefore writing queries, consult `references/api-patterns.md` for guidance.\n",
+      "files": [
+        "references/api-patterns.md",
+        "SKILL.md"
+      ],
+      "expectedScore": 94
+    },
+    {
+      "id": "long-description-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: long-description-skill\ndescription: This skill intentionally carries a description that runs well past the one thousand and twenty four character limit defined by the skill specification so that the validator can flag it under the description-format check. It keeps repeating filler guidance about what the skill does and when to use it in order to inflate the character count without adding any real meaning. Use this skill when you want a fixture whose description is long enough to breach the maximum allowed length while still containing plenty of words and reading like a plausible, if overly verbose, description. It goes on to describe imaginary triggers, imaginary file types, and imaginary workflows purely to consume characters. It continues describing more and more scenarios, more and more trigger phrases, and more and more capabilities until the total number of characters comfortably exceeds the documented ceiling of one thousand and twenty four characters, at which point the description-format check should record an error and withhold the associated points from the overall conformance score for this skill fixture.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis fixture exercises the description character-limit check.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 89
+    },
+    {
+      "id": "no-frontmatter-skill",
+      "kind": "skill",
+      "skillMd": "# No Frontmatter Skill\n\nThis skill is missing the YAML frontmatter entirely. It should score 0.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 0
+    },
+    {
+      "id": "readme-in-folder-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: readme-in-folder-skill\ndescription: This skill is well formed except that it includes a README.md inside the skill folder, which the specification disallows, so the validator should emit a warning under the no-readme check without blocking anything.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis fixture exercises the no-readme-in-folder check.\n",
+      "files": [
+        "README.md",
+        "SKILL.md"
+      ],
+      "expectedScore": 96
+    },
+    {
+      "id": "reserved-name-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: claude-helper\ndescription: This skill uses a reserved word in its name, which Anthropic does not permit, so the validator should flag the name as containing a reserved word even though the kebab-case shape is fine.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis fixture exercises the reserved-word name-format check.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 89
+    },
+    {
+      "id": "short-description-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: short-description-skill\ndescription: Too short.\n---\n\n## Instructions\n\nThis skill has a description that is too short.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 94
+    },
+    {
+      "id": "titled-ref-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: titled-ref-skill\ndescription: This skill references a missing file using a markdown link that carries a title string. The validator should ignore the title and flag the missing file as a broken reference.\nversion: 1.0.0\n---\n\n## Instructions\n\nRead the [setup guide](references/missing.md \"Setup Guide\") before continuing.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 93
+    },
+    {
+      "id": "valid-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: valid-skill\ndescription: A fully valid skill for testing purposes. This description is long enough to pass the minimum word count requirement and explains what the skill does in sufficient detail to be useful.\nversion: 1.0.0\ntags: [testing, example]\nauthor: skilldex-tests\n---\n\n## Instructions\n\nThis is a valid test skill that demonstrates proper SKILL.md format.\n\nUse this skill when you need to run integration tests or validate the Skilldex tooling.\n\n## Usage\n\nSimply invoke this skill to get a well-formatted, fully-compliant example.\n",
+      "files": [
+        "scripts/helper.sh",
+        "SKILL.md"
+      ],
+      "expectedScore": 100
+    },
+    {
+      "id": "xml-description-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: xml-description-skill\ndescription: This skill embeds an XML tag such as the <tool> element inside its description, which is forbidden because frontmatter is injected into the system prompt, so the validator should flag the description format as containing angle brackets.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis fixture exercises the description XML-tag check.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 89
+    }
+  ],
+  "skillsets": [
+    {
+      "id": "bad-structure-skillset",
+      "kind": "skillset",
+      "skillsetMd": "---\nname: bad-structure-skillset\ndescription: \"A skillset fixture with an unknown top-level directory to verify that the validator emits a warning for directories that are neither embedded skills nor the allowed assets directory.\"\nversion: \"1.0.0\"\ntags: [test]\nauthor: \"testuser\"\nspec_version: \"1.0\"\n---\n\n# bad-structure-skillset\n",
+      "files": [
+        "embedded-skill/SKILL.md",
+        "SKILLSET.md",
+        "unknown-dir/notes.txt"
+      ],
+      "embeddedSkillNames": [
+        "embedded-skill"
+      ],
+      "remoteSkillRefs": [],
+      "expectedScore": 87,
+      "coherence": {
+        "membersChecked": 1,
+        "membersCoherent": 1,
+        "errorCount": 0
+      }
+    },
+    {
+      "id": "empty-skillset",
+      "kind": "skillset",
+      "skillsetMd": "---\nname: empty-skillset\ndescription: \"A skillset that has a valid frontmatter and a description that is long enough to pass the word count check but contains absolutely no embedded skills and no remote skill references either.\"\nversion: \"1.0.0\"\ntags: [test]\nauthor: \"testuser\"\nspec_version: \"1.0\"\n---\n\n# empty-skillset\n\nNo embedded skills and no remote skills listed — should fail the has-skills check.\n",
+      "files": [
+        "SKILLSET.md"
+      ],
+      "embeddedSkillNames": [],
+      "remoteSkillRefs": [],
+      "expectedScore": 80,
+      "coherence": {
+        "membersChecked": 0,
+        "membersCoherent": 0,
+        "errorCount": 0
+      }
+    },
+    {
+      "id": "no-frontmatter-skillset",
+      "kind": "skillset",
+      "skillsetMd": "# no-frontmatter-skillset\n\nThis skillset has no YAML frontmatter — the validator should return score 0 with a fatal error.\n",
+      "files": [
+        "SKILLSET.md"
+      ],
+      "embeddedSkillNames": [],
+      "remoteSkillRefs": [],
+      "expectedScore": 0,
+      "coherence": {
+        "membersChecked": 0,
+        "membersCoherent": 0,
+        "errorCount": 0
+      }
+    },
+    {
+      "id": "short-desc-skillset",
+      "kind": "skillset",
+      "skillsetMd": "---\nname: short-desc-skillset\ndescription: \"Too short.\"\nversion: \"1.0.0\"\ntags: [test]\nauthor: \"testuser\"\nspec_version: \"1.0\"\n---\n\n# short-desc-skillset\n",
+      "files": [
+        "embedded-skill/SKILL.md",
+        "SKILLSET.md"
+      ],
+      "embeddedSkillNames": [
+        "embedded-skill"
+      ],
+      "remoteSkillRefs": [],
+      "expectedScore": 90,
+      "coherence": {
+        "membersChecked": 1,
+        "membersCoherent": 1,
+        "errorCount": 0
+      }
+    },
+    {
+      "id": "valid-skillset",
+      "kind": "skillset",
+      "skillsetMd": "---\nname: valid-skillset\ndescription: \"A complete test skillset used for validator unit tests. Contains one embedded skill and demonstrates the correct SKILLSET.md frontmatter structure including name, description, version, tags, author, and spec_version required fields.\"\nversion: \"1.0.0\"\ntags: [test, validation]\nauthor: \"testuser\"\nspec_version: \"1.0\"\n---\n\n# valid-skillset\n\nThis is a test skillset fixture for unit tests.\n",
+      "files": [
+        "embedded-skill/SKILL.md",
+        "SKILLSET.md"
+      ],
+      "embeddedSkillNames": [
+        "embedded-skill"
+      ],
+      "remoteSkillRefs": [],
+      "expectedScore": 100,
+      "coherence": {
+        "membersChecked": 1,
+        "membersCoherent": 1,
+        "errorCount": 0
+      }
+    }
+  ]
+}
