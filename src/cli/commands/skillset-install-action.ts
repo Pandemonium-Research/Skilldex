@@ -2,6 +2,18 @@ import ora from 'ora'
 import type { ScopeLevel } from '../../types/scope.js'
 import { installSkillsetFromPath } from '../../core/skillset-installer.js'
 import { printJson, printError, printSuccess, printInfo } from '../ui/output.js'
+import { formatCoherence, coherenceHint, coherenceJson } from '../ui/coherence.js'
+
+/**
+ * "Score: 100/100" plus coherence when there is any to report.
+ *
+ * Conformance says the skillset is well-formed; coherence says its members agree with each
+ * other. Showing only the first at install time hides the dimension a skillset exists for.
+ */
+function scoreLine(score: number, coherence: Parameters<typeof formatCoherence>[0], suffix = ''): string {
+  const parts = [`Score: ${score}/100`, formatCoherence(coherence), suffix].filter(Boolean)
+  return parts.join(' · ')
+}
 
 function isRegistryName(source: string): boolean {
   return (
@@ -51,9 +63,12 @@ export async function runSkillsetInstall(
         embeddedSkills: result.embeddedResults.map((r) => r.skillName),
         remoteSkills: result.remoteResults.map((r) => r.skillName),
         diagnostics: result.validation.diagnostics,
+        coherence: coherenceJson(result.validation.coherence),
       })
     } else {
-      printSuccess(`Score: ${result.validation.score}/100`)
+      printSuccess(scoreLine(result.validation.score, result.validation.coherence))
+      const hint = coherenceHint(result.validation.coherence)
+      if (hint) printInfo(`  ${hint}`)
       const allSkills = [
         ...result.embeddedResults.map((r) => r.skillName),
         ...result.remoteResults.map((r) => r.skillName),
@@ -114,9 +129,14 @@ async function runRegistrySkillsetInstall(
         embeddedSkills: result.embeddedResults.map((r) => r.skillName),
         remoteSkills: result.remoteResults.map((r) => r.skillName),
         trust_tier: info.trust_tier,
+        coherence: coherenceJson(result.validation.coherence),
       })
     } else {
-      printSuccess(`Score: ${result.validation.score}/100 · Trust: ${info.trust_tier}`)
+      printSuccess(
+        scoreLine(result.validation.score, result.validation.coherence, `Trust: ${info.trust_tier}`)
+      )
+      const hint = coherenceHint(result.validation.coherence)
+      if (hint) printInfo(`  ${hint}`)
       const allSkills = [
         ...result.embeddedResults.map((r) => r.skillName),
         ...result.remoteResults.map((r) => r.skillName),
@@ -173,9 +193,12 @@ async function runGitSkillsetInstall(
         score: result.validation.score,
         embeddedSkills: result.embeddedResults.map((r) => r.skillName),
         remoteSkills: result.remoteResults.map((r) => r.skillName),
+        coherence: coherenceJson(result.validation.coherence),
       })
     } else {
-      printSuccess(`Score: ${result.validation.score}/100`)
+      printSuccess(scoreLine(result.validation.score, result.validation.coherence))
+      const hint = coherenceHint(result.validation.coherence)
+      if (hint) printInfo(`  ${hint}`)
       const allSkills = [
         ...result.embeddedResults.map((r) => r.skillName),
         ...result.remoteResults.map((r) => r.skillName),

@@ -1,7 +1,7 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "generatedBy": "skilldex tests/conformance-corpus/generate.ts",
-  "note": "Expected scores are produced by skilldex, the reference implementation. skilldex-registry vendors this file and must reproduce every expectedScore. Coherence is recorded for reference only — the registry does not compute it.",
+  "note": "Expected values are produced by skilldex, the reference implementation. skilldex-registry vendors this file and must reproduce every expectedScore and expectedCoherence from its own validators.",
   "skills": [
     {
       "id": "anchored-ref-skill",
@@ -149,10 +149,46 @@
       ],
       "remoteSkillRefs": [],
       "expectedScore": 87,
-      "coherence": {
+      "blobs": {
+        "embedded-skill/SKILL.md": "---\nname: embedded-skill\ndescription: \"Embedded skill for the bad-structure-skillset fixture.\"\nversion: \"1.0.0\"\nspec_version: \"1.0\"\n---\n\n## Instructions\n\nTest.\n"
+      },
+      "expectedCoherence": {
         "membersChecked": 1,
         "membersCoherent": 1,
-        "errorCount": 0
+        "passCount": 0,
+        "warnCount": 0,
+        "errorCount": 0,
+        "declaredConventions": 0
+      }
+    },
+    {
+      "id": "coherent-skillset",
+      "kind": "skillset",
+      "skillsetMd": "---\nname: coherent-skillset\ndescription: \"A skillset whose member skills restate the shared commit convention declared in its assets folder, used to pin agreement checking across the two implementations of the coherence rules rather than only the structural ones.\"\nversion: \"1.0.0\"\ntags: [test, coherence]\nauthor: \"testuser\"\nspec_version: \"1.1\"\n---\n\n# coherent-skillset\n\nExercises shared-asset-agreement, which the structural fixtures cannot reach.\n",
+      "files": [
+        "assets/commit-conventions.md",
+        "changelog-writer/SKILL.md",
+        "commit-writer/SKILL.md",
+        "SKILLSET.md"
+      ],
+      "embeddedSkillNames": [
+        "changelog-writer",
+        "commit-writer"
+      ],
+      "remoteSkillRefs": [],
+      "expectedScore": 100,
+      "blobs": {
+        "assets/commit-conventions.md": "# Commit conventions\n\nEvery member of this skillset maps a commit type to a changelog section the same way.\n\n```yaml skilldex-conventions\ncommit-type-to-changelog-section:\n  feat: Added\n  fix: Fixed\n  docs: omit\n```\n",
+        "changelog-writer/SKILL.md": "---\nname: changelog-writer\ndescription: \"A member skill that restates the shared commit type convention and agrees with it, so the agreement check reports a pass that both implementations of the coherence rules must agree on exactly.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when grouping entries.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Added |\n| `fix` | Fixed |\n",
+        "commit-writer/SKILL.md": "---\nname: commit-writer\ndescription: \"A member skill that restates the shared commit type convention in its own table so the agreement check has something concrete to compare against the declaration held in the skillset assets folder.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when choosing a type.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Added |\n| `fix` | Fixed |\n"
+      },
+      "expectedCoherence": {
+        "membersChecked": 2,
+        "membersCoherent": 2,
+        "passCount": 6,
+        "warnCount": 0,
+        "errorCount": 0,
+        "declaredConventions": 1
       }
     },
     {
@@ -165,10 +201,44 @@
       "embeddedSkillNames": [],
       "remoteSkillRefs": [],
       "expectedScore": 80,
-      "coherence": {
+      "blobs": {},
+      "expectedCoherence": {
         "membersChecked": 0,
         "membersCoherent": 0,
-        "errorCount": 0
+        "passCount": 0,
+        "warnCount": 0,
+        "errorCount": 0,
+        "declaredConventions": 0
+      }
+    },
+    {
+      "id": "incoherent-skillset",
+      "kind": "skillset",
+      "skillsetMd": "---\nname: incoherent-skillset\ndescription: \"A skillset whose member skills restate the shared commit convention declared in its assets folder, used to pin agreement checking across the two implementations of the coherence rules rather than only the structural ones.\"\nversion: \"1.0.0\"\ntags: [test, coherence]\nauthor: \"testuser\"\nspec_version: \"1.1\"\n---\n\n# incoherent-skillset\n\nExercises shared-asset-agreement, which the structural fixtures cannot reach.\n",
+      "files": [
+        "assets/commit-conventions.md",
+        "changelog-writer/SKILL.md",
+        "commit-writer/SKILL.md",
+        "SKILLSET.md"
+      ],
+      "embeddedSkillNames": [
+        "changelog-writer",
+        "commit-writer"
+      ],
+      "remoteSkillRefs": [],
+      "expectedScore": 100,
+      "blobs": {
+        "assets/commit-conventions.md": "# Commit conventions\n\nEvery member of this skillset maps a commit type to a changelog section the same way.\n\n```yaml skilldex-conventions\ncommit-type-to-changelog-section:\n  feat: Added\n  fix: Fixed\n  docs: omit\n```\n",
+        "changelog-writer/SKILL.md": "---\nname: changelog-writer\ndescription: \"A member skill that restates the shared commit type convention but contradicts it, so the agreement check reports an error that both implementations of the coherence rules must agree on exactly.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when grouping entries.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Fixed |\n| `fix` | Added |\n",
+        "commit-writer/SKILL.md": "---\nname: commit-writer\ndescription: \"A member skill that restates the shared commit type convention in its own table so the agreement check has something concrete to compare against the declaration held in the skillset assets folder.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when choosing a type.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Added |\n| `fix` | Fixed |\n"
+      },
+      "expectedCoherence": {
+        "membersChecked": 2,
+        "membersCoherent": 1,
+        "passCount": 5,
+        "warnCount": 0,
+        "errorCount": 2,
+        "declaredConventions": 1
       }
     },
     {
@@ -181,10 +251,14 @@
       "embeddedSkillNames": [],
       "remoteSkillRefs": [],
       "expectedScore": 0,
-      "coherence": {
+      "blobs": {},
+      "expectedCoherence": {
         "membersChecked": 0,
         "membersCoherent": 0,
-        "errorCount": 0
+        "passCount": 0,
+        "warnCount": 0,
+        "errorCount": 0,
+        "declaredConventions": 0
       }
     },
     {
@@ -200,10 +274,16 @@
       ],
       "remoteSkillRefs": [],
       "expectedScore": 90,
-      "coherence": {
+      "blobs": {
+        "embedded-skill/SKILL.md": "---\nname: embedded-skill\ndescription: \"A test embedded skill for the short description skillset fixture.\"\nversion: \"1.0.0\"\nspec_version: \"1.0\"\n---\n\n## Instructions\n\nTest skill.\n"
+      },
+      "expectedCoherence": {
         "membersChecked": 1,
         "membersCoherent": 1,
-        "errorCount": 0
+        "passCount": 0,
+        "warnCount": 0,
+        "errorCount": 0,
+        "declaredConventions": 0
       }
     },
     {
@@ -219,10 +299,16 @@
       ],
       "remoteSkillRefs": [],
       "expectedScore": 100,
-      "coherence": {
+      "blobs": {
+        "embedded-skill/SKILL.md": "---\nname: embedded-skill\ndescription: \"An embedded skill inside the valid-skillset fixture. Used to verify that the skillset validator correctly discovers and counts embedded skills when scoring a skillset.\"\nversion: \"1.0.0\"\ntags: [test]\nauthor: \"testuser\"\nspec_version: \"1.0\"\n---\n\n## Instructions\n\nThis is a test embedded skill.\n"
+      },
+      "expectedCoherence": {
         "membersChecked": 1,
         "membersCoherent": 1,
-        "errorCount": 0
+        "passCount": 0,
+        "warnCount": 0,
+        "errorCount": 0,
+        "declaredConventions": 0
       }
     }
   ]

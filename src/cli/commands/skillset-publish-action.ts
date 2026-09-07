@@ -5,6 +5,31 @@ import { parse as parseYaml } from 'yaml'
 import { simpleGit } from 'simple-git'
 import { publishSkillset, updateSkillset } from '../../registry/sources/registry.js'
 import { printJson, printError, printSuccess, printWarning, printInfo } from '../ui/output.js'
+import { formatCoherence, coherenceHint } from '../ui/coherence.js'
+import type { PublishSkillsetResponse } from '../../registry/sources/registry.js'
+
+/**
+ * Report what the registry made of the skillset.
+ *
+ * The score and coherence both come from the registry rather than from a local run: it fetches
+ * the published source itself and computes both, so echoing a local result here could show a
+ * number that differs from the one the listing will carry.
+ */
+function printRegistryResult(result: PublishSkillsetResponse): void {
+  const line = [`Score: ${result.skillset.score ?? 'n/a'}/100`, formatCoherence(result.coherence)]
+    .filter(Boolean)
+    .join(' · ')
+  printSuccess(line)
+
+  const hint = coherenceHint(result.coherence)
+  if (hint) printInfo(`  ${hint}`)
+
+  for (const d of result.diagnostics) {
+    const loc = d.line !== undefined ? `line ${d.line}: ` : ''
+    if (d.level === 'error') printError(`${loc}${d.message}`)
+    else printWarning(`${loc}${d.message}`)
+  }
+}
 
 async function detectSourceUrl(skillsetPath: string): Promise<string | null> {
   try {
@@ -71,12 +96,7 @@ export async function runSkillsetPublish(options: {
       if (options.json) {
         printJson(result)
       } else {
-        printSuccess(`Score: ${result.skillset.score ?? 'n/a'}/100`)
-        for (const d of result.diagnostics) {
-          const loc = d.line !== undefined ? `line ${d.line}: ` : ''
-          if (d.level === 'error') printError(`${loc}${d.message}`)
-          else printWarning(`${loc}${d.message}`)
-        }
+        printRegistryResult(result)
       }
       return
     }
@@ -101,12 +121,7 @@ export async function runSkillsetPublish(options: {
       printJson(result)
     } else {
       printInfo(`Source: ${detectedUrl}`)
-      printSuccess(`Score: ${result.skillset.score ?? 'n/a'}/100`)
-      for (const d of result.diagnostics) {
-        const loc = d.line !== undefined ? `line ${d.line}: ` : ''
-        if (d.level === 'error') printError(`${loc}${d.message}`)
-        else printWarning(`${loc}${d.message}`)
-      }
+      printRegistryResult(result)
       printInfo(`Install with: skillpm skillset install ${skillsetName}`)
     }
   } catch (e) {

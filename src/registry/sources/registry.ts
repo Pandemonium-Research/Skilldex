@@ -2,6 +2,8 @@
 // Connects to the hosted registry at SKILLDEX_REGISTRY_URL (default: https://registry.skilldex.dev/v1)
 // Resolution order: env var → config file → built-in default
 
+import type { SkillsetCoherenceResult } from '../../types/skillset.js'
+
 async function getRegistryBase(): Promise<string> {
   try {
     const { getConfigValue } = await import('../../core/config.js')
@@ -143,6 +145,23 @@ export interface RegistrySkillset {
   install_count: number
   published_at: string
   skills: Array<{ name: string; source_url: string }>
+  /**
+   * Registry-computed coherence summary, in the API's snake_case.
+   *
+   * Optional because a registry predating skillset spec 1.1 does not send it, and the CLI is
+   * routinely a version ahead of the deployment it is talking to. null means the skillset was
+   * published before coherence was recorded; a zeroed `members_checked` means it has no members
+   * to check. Neither is the same as scoring badly.
+   */
+  coherence?: {
+    members_checked: number
+    members_coherent: number
+    pct: number | null
+    pass_count: number
+    warn_count: number
+    error_count: number
+    declared_conventions: number
+  } | null
 }
 
 export interface SkillsetInstallInfo {
@@ -170,6 +189,15 @@ export interface PublishSkillsetBody {
 export interface PublishSkillsetResponse {
   skillset: RegistrySkillset
   diagnostics: Array<{ level: string; line?: number; message: string }>
+  /**
+   * The full coherence result the registry computed, not the summary carried on `skillset`.
+   *
+   * Publishing is the moment the detail is worth having: it is the publisher's own skillset, and
+   * a contradiction between two of its members is something only they can fix. The shape matches
+   * the local validator's SkillsetCoherenceResult, because the registry runs a port of it.
+   * Optional — a registry predating spec 1.1 omits it.
+   */
+  coherence?: SkillsetCoherenceResult
 }
 
 export async function searchSkillsets(options: SearchOptions = {}): Promise<SkillsetSearchResponse> {

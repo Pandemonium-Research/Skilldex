@@ -57,8 +57,42 @@ interface SkillsetCase {
   embeddedSkillNames: string[]
   remoteSkillRefs: Array<{ name: string; source_url: string }>
   expectedScore: number
-  /** Recorded for reference only. The registry does not compute coherence (spec 1.1). */
-  coherence: { membersChecked: number; membersCoherent: number; errorCount: number } | null
+  /**
+   * Contents of every member SKILL.md and shared asset, keyed by skillset-relative path.
+   *
+   * Coherence is the one check that reads beyond SKILLSET.md, and the registry's validators are
+   * pure functions over content — they never touch a filesystem. Without these the registry could
+   * vendor this file and reproduce nothing.
+   */
+  blobs: Record<string, string>
+  /** What skilldex computes. The registry must now reproduce it, not merely record it. */
+  expectedCoherence: {
+    membersChecked: number
+    membersCoherent: number
+    passCount: number
+    warnCount: number
+    errorCount: number
+    declaredConventions: number
+  } | null
+}
+
+/**
+ * The files a coherence check reads: every member's SKILL.md and every shared asset.
+ *
+ * Deliberately not every file in the fixture. The listing in `files` already answers the
+ * existence questions, so embedding the rest would grow the manifest without letting the
+ * registry verify anything it cannot verify already.
+ */
+function coherenceBlobs(dir: string, files: string[]): Record<string, string> {
+  const wanted = files.filter((f) => {
+    const parts = f.split('/')
+    if (parts.length === 2 && parts[1] === 'SKILL.md') return true
+    return parts.length === 2 && parts[0] === 'assets' && parts[1].endsWith('.md')
+  })
+
+  return Object.fromEntries(
+    wanted.map((f) => [f, readFileSync(path.join(dir, ...f.split('/')), 'utf8')])
+  )
 }
 
 async function main() {
@@ -93,11 +127,15 @@ async function main() {
           source_url: r.source_url,
         })),
         expectedScore: result.score,
-        coherence: result.coherence
+        blobs: coherenceBlobs(dir, files),
+        expectedCoherence: result.coherence
           ? {
               membersChecked: result.coherence.membersChecked,
               membersCoherent: result.coherence.membersCoherent,
+              passCount: result.coherence.passCount,
+              warnCount: result.coherence.warnCount,
               errorCount: result.coherence.errorCount,
+              declaredConventions: result.coherence.declaredConventions.length,
             }
           : null,
       })
@@ -106,12 +144,14 @@ async function main() {
 
   const manifest = {
     // Bump when the SHAPE of this file changes, so a stale vendored copy is obvious.
-    formatVersion: 1,
+    // 2: coherence became reproducible rather than informational — added `blobs` and renamed
+    // `coherence` to `expectedCoherence`, matching `expectedScore`.
+    formatVersion: 2,
     generatedBy: 'skilldex tests/conformance-corpus/generate.ts',
     note:
-      'Expected scores are produced by skilldex, the reference implementation. ' +
-      'skilldex-registry vendors this file and must reproduce every expectedScore. ' +
-      'Coherence is recorded for reference only — the registry does not compute it.',
+      'Expected values are produced by skilldex, the reference implementation. ' +
+      'skilldex-registry vendors this file and must reproduce every expectedScore and ' +
+      'expectedCoherence from its own validators.',
     skills,
     skillsets,
   }

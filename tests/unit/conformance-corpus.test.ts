@@ -32,12 +32,21 @@ const manifest = JSON.parse(readFileSync(path.join(CORPUS, 'manifest.json'), 'ut
     embeddedSkillNames: string[]
     remoteSkillRefs: Array<{ name: string; source_url: string }>
     expectedScore: number
+    blobs: Record<string, string>
+    expectedCoherence: {
+      membersChecked: number
+      membersCoherent: number
+      passCount: number
+      warnCount: number
+      errorCount: number
+      declaredConventions: number
+    } | null
   }>
 }
 
 describe('conformance corpus — skilldex side', () => {
   it('is the expected format version', () => {
-    expect(manifest.formatVersion).toBe(1)
+    expect(manifest.formatVersion).toBe(2)
   })
 
   it('covers every fixture directory, so new fixtures cannot be silently omitted', () => {
@@ -64,7 +73,52 @@ describe('conformance corpus — skilldex side', () => {
       const result = await validateSkillset(path.join(FIXTURES, c.id))
       expect(result.score).toBe(c.expectedScore)
     })
+
+    it(`skillset ${c.id} coheres as recorded`, async () => {
+      const { coherence } = await validateSkillset(path.join(FIXTURES, c.id))
+      expect({
+        membersChecked: coherence.membersChecked,
+        membersCoherent: coherence.membersCoherent,
+        passCount: coherence.passCount,
+        warnCount: coherence.warnCount,
+        errorCount: coherence.errorCount,
+        declaredConventions: coherence.declaredConventions.length,
+      }).toEqual(c.expectedCoherence)
+    })
   }
+
+  it('exercises agreement, not just structure', () => {
+    // Every structural fixture happens to be fully coherent, so pinning only those would let the
+    // registry reproduce "all zeros" and look correct while implementing agreement wrongly. The
+    // corpus needs at least one skillset whose members genuinely contradict a declared
+    // convention, and one that genuinely honours it.
+    const withConventions = manifest.skillsets.filter(
+      (c) => (c.expectedCoherence?.declaredConventions ?? 0) > 0
+    )
+    expect(withConventions.length).toBeGreaterThan(0)
+    expect(withConventions.some((c) => (c.expectedCoherence?.errorCount ?? 0) > 0)).toBe(true)
+    expect(
+      withConventions.some(
+        (c) =>
+          c.expectedCoherence !== null &&
+          c.expectedCoherence.errorCount === 0 &&
+          c.expectedCoherence.membersChecked > 0 &&
+          c.expectedCoherence.membersCoherent === c.expectedCoherence.membersChecked
+      )
+    ).toBe(true)
+  })
+
+  it('separates conformance from coherence', () => {
+    // The two fixtures that differ only in whether their members agree must score identically
+    // on structure. If a coherence failure moved the conformance score, the split this whole
+    // design rests on would be a fiction.
+    const coherent = manifest.skillsets.find((c) => c.id === 'coherent-skillset')
+    const incoherent = manifest.skillsets.find((c) => c.id === 'incoherent-skillset')
+
+    expect(coherent?.expectedScore).toBe(incoherent?.expectedScore)
+    expect(coherent?.expectedCoherence?.errorCount).toBe(0)
+    expect(incoherent?.expectedCoherence?.errorCount).toBeGreaterThan(0)
+  })
 
   it('records the content the registry validates, not just the score', () => {
     // The registry's validators are pure functions over content — they never read a
@@ -89,6 +143,26 @@ describe('conformance corpus — skilldex side', () => {
     for (const c of manifest.skillsets) {
       const onDisk = readFileSync(path.join(FIXTURES, c.id, 'SKILLSET.md'), 'utf8')
       expect(c.skillsetMd.replace(/\r\n/g, '\n')).toBe(onDisk.replace(/\r\n/g, '\n'))
+    }
+  })
+
+  it('embeds every member and shared asset a coherence check reads', () => {
+    // These are the only files coherence opens. If one is missing from the manifest the registry
+    // silently checks a smaller skillset than skilldex did and still agrees on the totals, which
+    // is exactly the kind of false agreement the corpus exists to prevent.
+    for (const c of manifest.skillsets) {
+      const needed = c.files.filter((f) => {
+        const parts = f.split('/')
+        if (parts.length === 2 && parts[1] === 'SKILL.md') return true
+        return parts.length === 2 && parts[0] === 'assets' && parts[1].endsWith('.md')
+      })
+
+      expect(Object.keys(c.blobs).sort()).toEqual(needed.sort())
+
+      for (const [rel, content] of Object.entries(c.blobs)) {
+        const onDisk = readFileSync(path.join(FIXTURES, c.id, ...rel.split('/')), 'utf8')
+        expect(content.replace(/\r\n/g, '\n')).toBe(onDisk.replace(/\r\n/g, '\n'))
+      }
     }
   })
 })

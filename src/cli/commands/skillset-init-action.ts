@@ -1,14 +1,17 @@
 import { mkdir, writeFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { printError, printSuccess, printInfo } from '../ui/output.js'
+import { SKILLSET_SPEC_VERSION } from '../../core/skillset-validator.js'
 
+// Interpolated rather than written out, so the scaffold cannot fall behind the spec the
+// validator implements — which is how it came to declare 1.0 while everything else moved to 1.1.
 const TEMPLATE = (name: string) => `---
 name: ${name}
 description: "Describe what this skillset does and which agent use-case it targets. Aim for 30+ words to pass validation."
 version: "1.0.0"
 tags: []
 author: ""
-spec_version: "1.0"
+spec_version: "${SKILLSET_SPEC_VERSION}"
 # List remote skills that are not embedded in this directory:
 # skills:
 #   - name: some-remote-skill
