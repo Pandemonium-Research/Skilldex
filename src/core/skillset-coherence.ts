@@ -300,7 +300,7 @@ async function collectDeclaredConventions(
 /** Extracts ```yaml skilldex-conventions fenced blocks. Exported for tests. */
 export function parseDeclaredConventions(content: string, assetFile: string): DeclaredConvention[] {
   const conventions: DeclaredConvention[] = []
-  const lines = content.split('\n')
+  const lines = splitLines(content)
 
   for (let i = 0; i < lines.length; i++) {
     const fence = lines[i].match(/^(\s*)(`{3,}|~{3,})\s*(.*)$/)
@@ -367,7 +367,7 @@ interface AssetReference {
 export function extractAssetReferences(content: string): AssetReference[] {
   const refs: AssetReference[] = []
   const seen = new Set<string>()
-  const lines = content.split('\n')
+  const lines = splitLines(content)
 
   const pattern = /`((?:\.\.\/)?(?:assets|references)\/[^`\s]+)`/g
 
@@ -392,7 +392,7 @@ export function extractAssetReferences(content: string): AssetReference[] {
 /** Parses pipe tables into header + rows. Exported for tests. */
 export function parseMarkdownTables(content: string): MarkdownTable[] {
   const tables: MarkdownTable[] = []
-  const lines = content.split('\n')
+  const lines = splitLines(content)
 
   for (let i = 0; i < lines.length - 1; i++) {
     if (!isTableRow(lines[i]) || !isSeparatorRow(lines[i + 1])) continue
@@ -518,6 +518,21 @@ function countKeyOverlap(a: MarkdownTable, b: MarkdownTable): number {
     if (bKeys.has(key)) overlap++
   }
   return overlap
+}
+
+/**
+ * Splits into lines, tolerating CRLF.
+ *
+ * Plain split('\n') leaves a trailing \r on every line, which silently broke fence detection: the
+ * info-string regex ends in (.*)$, and `.` does not match \r while `$` without /m demands the true
+ * end of input, so a fence line read as "```yaml skilldex-conventions\r" matched nothing at all.
+ * Every convention in a CRLF working tree therefore went undeclared — agreement checking was
+ * disabled, and the conventions were then reported as *undeclared*, the opposite of what the asset
+ * says. Git stores LF, so this only ever bit checkouts with core.autocrlf on. Same class as the
+ * frontmatter CRLF fixes.
+ */
+function splitLines(content: string): string[] {
+  return content.split(/\r?\n/)
 }
 
 // --- Normalization ---
