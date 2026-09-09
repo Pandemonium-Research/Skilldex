@@ -1,16 +1,42 @@
 // Skilldex Registry API client
-// Connects to the hosted registry at SKILLDEX_REGISTRY_URL (default: https://registry.skilldex.dev/v1)
+// Connects to the hosted registry at SKILLDEX_REGISTRY_URL (default: DEFAULT_REGISTRY_URL below)
 // Resolution order: env var → config file → built-in default
 
 import type { SkillsetCoherenceResult } from '../../types/skillset.js'
 
+/**
+ * Where the registry lives when nothing says otherwise.
+ *
+ * A constant because the value was previously written out at each use, and the comment at the top
+ * of this file documented a third, different host — `registry.skilldex.dev`, which does not
+ * resolve. Two commands still told users to fetch an auth token from it.
+ */
+const DEFAULT_REGISTRY_URL = 'https://skilldex-registry.vercel.app/v1'
+
 async function getRegistryBase(): Promise<string> {
+  // Env var first, as documented above. It used to be read only from the catch branch, so it took
+  // effect solely when importing the config module threw — which is to say, essentially never:
+  // setting SKILLDEX_REGISTRY_URL appeared to do nothing at all.
+  if (process.env.SKILLDEX_REGISTRY_URL) return process.env.SKILLDEX_REGISTRY_URL
+
   try {
     const { getConfigValue } = await import('../../core/config.js')
-    return (await getConfigValue('registryUrl')) ?? 'https://skilldex-registry.vercel.app/v1'
+    return (await getConfigValue('registryUrl')) ?? DEFAULT_REGISTRY_URL
   } catch {
-    return process.env.SKILLDEX_REGISTRY_URL ?? 'https://skilldex-registry.vercel.app/v1'
+    return DEFAULT_REGISTRY_URL
   }
+}
+
+/**
+ * Where a user obtains a publish token.
+ *
+ * Derived from the same base every request uses, rather than written out beside each error
+ * message. The two hardcoded copies both named a dead host, so the one instruction a blocked
+ * publisher receives sent them somewhere that does not resolve — and pointing anyone running
+ * against a custom registry at the public one would have been wrong even had it worked.
+ */
+export async function getAuthUrl(): Promise<string> {
+  return `${(await getRegistryBase()).replace(/\/$/, '')}/auth/github`
 }
 
 export interface RegistrySkill {
