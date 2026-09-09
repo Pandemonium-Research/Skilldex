@@ -60,6 +60,62 @@ export function coherenceHint(c: CoherenceCounts | null | undefined): string | n
   return `${parts.join(', ')} — run "skillpm skillset validate" for details`
 }
 
+/**
+ * The registry's coherence summary, which is snake_case where the validator's is camelCase.
+ *
+ * Locally-computed coherence arrives as the validator's own result; a searched or fetched skillset
+ * arrives as the API DTO. Both describe the same thing, so rather than teach the formatters two
+ * shapes, the API shape is adapted once here.
+ *
+ * Declared structurally rather than imported from the registry client, so the UI layer does not
+ * take a dependency on the transport for the sake of six numbers.
+ */
+export interface RegistryCoherenceSummary {
+  members_checked: number
+  members_coherent: number
+  pct: number | null
+  pass_count: number
+  warn_count: number
+  error_count: number
+  declared_conventions: number
+}
+
+/** Adapt a registry summary for formatCoherence / coherenceHint. */
+export function registryCoherenceCounts(
+  s: RegistryCoherenceSummary | null | undefined
+): CoherenceCounts | null {
+  if (!s) return null
+
+  return {
+    membersChecked: s.members_checked,
+    membersCoherent: s.members_coherent,
+    passCount: s.pass_count,
+    warnCount: s.warn_count,
+    errorCount: s.error_count,
+  }
+}
+
+/**
+ * Adapt a registry summary for --json.
+ *
+ * Separate from registryCoherenceCounts because the conventions cannot round-trip through
+ * CoherenceCounts: that carries the declarations themselves, and the registry sends only how many
+ * there were. Synthesising an array of that length to satisfy the type would be inventing data to
+ * make a shape fit.
+ */
+export function registryCoherenceJson(s: RegistryCoherenceSummary | null | undefined) {
+  if (!s) return null
+
+  return {
+    membersChecked: s.members_checked,
+    membersCoherent: s.members_coherent,
+    passCount: s.pass_count,
+    warnCount: s.warn_count,
+    errorCount: s.error_count,
+    declaredConventions: s.declared_conventions,
+  }
+}
+
 /** Machine-readable summary for --json, in the camelCase the CLI's own output already uses. */
 export function coherenceJson(c: CoherenceCounts | null | undefined) {
   if (!c) return null
