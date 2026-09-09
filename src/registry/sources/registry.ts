@@ -213,11 +213,31 @@ export interface PublishSkillsetResponse {
   coherence?: SkillsetCoherenceResult
 }
 
-export async function searchSkillsets(options: SearchOptions = {}): Promise<SkillsetSearchResponse> {
+/**
+ * Skillsets accept one ordering that skills do not.
+ *
+ * `coherence` orders by the registry's generated `coherence_pct`. Kept out of `SearchSort` rather
+ * than added to it because /skills rejects the value — a skill has no members to agree with each
+ * other — and a shared union would let it be sent there and 400.
+ */
+export type SkillsetSearchSort = SearchSort | 'coherence'
+
+export interface SkillsetSearchOptions extends Omit<SearchOptions, 'sort'> {
+  sort?: SkillsetSearchSort
+  /** Floor on the percentage of members found coherent, 0-100. */
+  min_coherence?: number
+}
+
+export async function searchSkillsets(
+  options: SkillsetSearchOptions = {}
+): Promise<SkillsetSearchResponse> {
   const params = new URLSearchParams()
   if (options.q) params.set('q', options.q)
   if (options.tier) params.set('tier', options.tier)
   if (options.min_score !== undefined) params.set('min_score', String(options.min_score))
+  if (options.min_coherence !== undefined) {
+    params.set('min_coherence', String(options.min_coherence))
+  }
   if (options.spec_version) params.set('spec_version', options.spec_version)
   if (options.tags) params.set('tags', options.tags)
   if (options.sort) params.set('sort', options.sort)

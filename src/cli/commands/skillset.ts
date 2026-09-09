@@ -36,6 +36,33 @@ export function registerSkillset(program: Command): void {
     })
 
   skillset
+    // Query optional, unlike `skillpm search`. Few enough skillsets are published that listing
+    // them all is a reasonable thing to ask for, and the registry treats an absent `q` as "no
+    // text filter" rather than "match nothing".
+    .command('search [query]')
+    .description('Search the registry for skillsets')
+    .option('--tier <tier>', 'Filter by trust tier: verified or community')
+    .option('--sort <sort>', 'Sort by: relevance, coherence, installs, score, recent, name')
+    .option('--min-coherence <pct>', 'Only skillsets whose members agree at least this much (0-100)')
+    .option('--limit <n>', 'Number of results (max 50)', '10')
+    .option('--json', 'Output as JSON')
+    .action(
+      async (
+        query: string | undefined,
+        options: {
+          tier?: string
+          sort?: string
+          minCoherence?: string
+          limit: string
+          json: boolean
+        }
+      ) => {
+        const { runSkillsetSearch } = await import('./skillset-search-action.js')
+        await runSkillsetSearch(query, options)
+      }
+    )
+
+  skillset
     .command('list')
     .description('List installed skillsets')
     .option('-s, --scope <scope>', 'Filter by scope: global, shared, or project')
