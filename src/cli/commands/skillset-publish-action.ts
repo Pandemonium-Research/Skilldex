@@ -38,8 +38,9 @@ export async function runSkillsetPublish(options: {
   const { getConfigValue } = await import('../../core/config.js')
   const token = await getConfigValue('token')
   if (!token) {
+    const { getAuthUrl } = await import('../../registry/sources/registry.js')
     printError(
-      'No auth token found. Get your token from https://registry.skilldex.dev/auth/github, then run: skillpm config set token <token>'
+      `No auth token found. Get your token from ${await getAuthUrl()}, then run: skillpm config set token <token>`
     )
     process.exit(1)
   }

@@ -7,6 +7,7 @@ import { installSkillsetFromPath, uninstallSkillset } from '../core/skillset-ins
 import { validateSkillset } from '../core/skillset-validator.js'
 import { resolveScope, resolveAllScopes } from '../core/resolver.js'
 import { readManifest } from '../core/manifest.js'
+import { isRegistryName, isGitSource } from '../core/source-kind.js'
 import { installFromGitUrl } from '../registry/sources/github.js'
 
 export async function startMcpServer(): Promise<void> {
@@ -155,11 +156,11 @@ export async function startMcpServer(): Promise<void> {
       force: z.boolean().default(false),
     },
     async ({ source, scope, force }) => {
-      const isGitUrl = source.startsWith('git+')
-      const isRegistryName = !isGitUrl && !source.startsWith('/') && !source.startsWith('.') && !source.includes('://')
+      const isGitUrl = isGitSource(source)
+      const fromRegistry = isRegistryName(source)
 
       let result
-      if (isRegistryName) {
+      if (fromRegistry) {
         const { mkdtemp, rm } = await import('node:fs/promises')
         const path = await import('node:path')
         const os = await import('node:os')

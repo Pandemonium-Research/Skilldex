@@ -169,7 +169,7 @@ skillpm publish --tags forensics,analysis
 skillpm publish --update
 ```
 
-Requires an auth token: get one at `https://registry.skilldex.dev/auth/github`, then `skillpm config set token <token>`.
+Requires an auth token: get one at `https://skilldex-registry.vercel.app/v1/auth/github`, then `skillpm config set token <token>`.
 
 ### AI-powered skill suggestions
 

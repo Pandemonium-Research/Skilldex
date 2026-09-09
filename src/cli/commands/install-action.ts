@@ -1,13 +1,9 @@
 import ora from 'ora'
 import type { ScopeLevel } from '../../types/scope.js'
 import { installFromPath, type InstallResult } from '../../core/installer.js'
+import { isRegistryName, isGitSource } from '../../core/source-kind.js'
 import { printValidationReport, printJson, printError, printSuccess, printWarning, printInfo } from '../ui/output.js'
 
-function isRegistryName(source: string): boolean {
-  // A plain skill name: no path separators, no git+, no protocol, no dots suggesting a path
-  return !source.startsWith('git+') && !source.startsWith('/') && !source.startsWith('./') &&
-    !source.startsWith('../') && !source.includes('://') && !source.endsWith('.md')
-}
 
 /**
  * An install that did not bridge is invisible to every agent, so say what happened.
@@ -28,7 +24,7 @@ export async function runInstall(
   source: string,
   options: { scope: ScopeLevel; force: boolean; json: boolean; bridge?: boolean }
 ): Promise<void> {
-  const isGitUrl = source.startsWith('git+')
+  const isGitUrl = isGitSource(source)
 
   if (!isGitUrl && isRegistryName(source)) {
     await runRegistryInstall(source, options)

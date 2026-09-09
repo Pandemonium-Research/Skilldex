@@ -3,6 +3,7 @@ import type { ScopeLevel } from '../../types/scope.js'
 import { installSkillsetFromPath } from '../../core/skillset-installer.js'
 import { printJson, printError, printSuccess, printInfo } from '../ui/output.js'
 import { formatCoherence, coherenceHint, coherenceJson } from '../ui/coherence.js'
+import { isRegistryName } from '../../core/source-kind.js'
 
 /**
  * "Score: 100/100" plus coherence when there is any to report.
@@ -15,16 +16,6 @@ function scoreLine(score: number, coherence: Parameters<typeof formatCoherence>[
   return parts.join(' · ')
 }
 
-function isRegistryName(source: string): boolean {
-  return (
-    !source.startsWith('git+') &&
-    !source.startsWith('/') &&
-    !source.startsWith('./') &&
-    !source.startsWith('../') &&
-    !source.includes('://') &&
-    !source.endsWith('.md')
-  )
-}
 
 export async function runSkillsetInstall(
   source: string,
