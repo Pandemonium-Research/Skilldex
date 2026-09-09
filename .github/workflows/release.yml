@@ -5,8 +5,22 @@ on:
     tags:
       - 'v*'
 
+# Publishing is authenticated by OIDC (npm trusted publishing), not by a stored token.
+#
+# The long-lived NPM_TOKEN this replaced had two problems. It expires, and npm reports an expired
+# or unauthorised token as `E404 — not found`, which reads as a missing package rather than an
+# auth failure: that error cost a release cycle to diagnose. And npm is retiring 2FA-bypass tokens
+# for direct publishing in January 2027, so the token was on a clock regardless.
+#
+# With OIDC there is no credential to expire, rotate, or leak. npm also generates provenance
+# attestations automatically for a public package published this way, which a token publish does
+# not get.
+#
+# Requires npm >= 11.5.1 and Node >= 22.14.0; node-version 24 currently resolves to 24.20.0,
+# which bundles npm 11.19.0.
 permissions:
   contents: write  # needed to create GitHub Releases
+  id-token: write  # needed to mint the OIDC token npm verifies
 
 jobs:
   release:
@@ -32,10 +46,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      # No NODE_AUTH_TOKEN. Deliberately: were the token still in the environment npm would
+      # authenticate with it and OIDC would never be exercised, so a misconfigured trusted
+      # publisher would stay invisible until the token expired — which is exactly the failure
+      # this change exists to remove. Absent it, a broken setup fails here and says so.
       - name: Publish to npm
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Extract version from tag
         id: version
