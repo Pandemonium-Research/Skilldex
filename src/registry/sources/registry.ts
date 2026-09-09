@@ -26,13 +26,26 @@ export interface RegistrySkill {
   published_at: string
 }
 
+/**
+ * Orderings the registry accepts.
+ *
+ * `relevance` was missing here, which is why nothing flagged the CLI hardcoding `installs` and
+ * losing BM25 ranking on every search: the one ordering a text query actually wants was not in
+ * the type, so asking for it looked like a mistake.
+ *
+ * Leaving `sort` unset is not the same as picking one. The registry resolves an absent sort to
+ * relevance when a query is present and to installs when it is not, and any explicit value is
+ * returned unchanged — so a caller that always sends something can never get that behaviour.
+ */
+export type SearchSort = 'relevance' | 'installs' | 'score' | 'recent' | 'name'
+
 export interface SearchOptions {
   q?: string
   tier?: 'verified' | 'community'
   min_score?: number
   spec_version?: string
   tags?: string
-  sort?: 'installs' | 'score' | 'recent' | 'name'
+  sort?: SearchSort
   limit?: number
   offset?: number
 }
