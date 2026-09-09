@@ -2,7 +2,7 @@ import chalk from 'chalk'
 import ora from 'ora'
 import { searchRegistry } from '../../registry/sources/registry.js'
 import { printJson, printError, printInfo } from '../ui/output.js'
-import type { RegistrySkill } from '../../registry/sources/registry.js'
+import type { RegistrySkill, SearchSort } from '../../registry/sources/registry.js'
 
 function tierBadge(tier: RegistrySkill['trust_tier']): string {
   return tier === 'verified'
@@ -31,7 +31,7 @@ function renderSkillCard(skill: RegistrySkill, _index: number): void {
 
 export async function runSearch(
   query: string,
-  options: { tier?: string; sort: string; limit: string; json: boolean }
+  options: { tier?: string; sort?: string; limit: string; json: boolean }
 ): Promise<void> {
   const limit = Math.min(parseInt(options.limit, 10) || 10, 50)
   const spinner = options.json ? null : ora(`Searching registry for "${query}"...`).start()
@@ -40,7 +40,10 @@ export async function runSearch(
     const result = await searchRegistry({
       q: query,
       tier: options.tier as RegistrySkill['trust_tier'] | undefined,
-      sort: options.sort as 'installs' | 'score' | 'recent' | 'name',
+      // Passed through undefined when unset, never defaulted. searchRegistry omits the param
+      // entirely, which is the only way to ask the registry for its own default — and with a
+      // query present that default is relevance.
+      sort: options.sort as SearchSort | undefined,
       limit,
     })
 
