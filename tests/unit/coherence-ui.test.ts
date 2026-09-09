@@ -9,7 +9,15 @@
 import { describe, it, expect } from 'vitest'
 import { formatCoherence, coherenceHint, coherenceJson } from '../../src/cli/ui/coherence.js'
 
-/** Strip ANSI so assertions do not depend on whether chalk detected a TTY. */
+/**
+ * Strip ANSI so assertions do not depend on whether chalk detected a TTY.
+ *
+ * The escape character is precisely what has to be matched here, so no-control-regex is disabled
+ * deliberately rather than worked around. Writing it as a unicode escape trips the same rule,
+ * and building the pattern through String.fromCharCode(27) would only hide it from the linter
+ * while making the intent harder to read.
+ */
+// eslint-disable-next-line no-control-regex
 const plain = (s: string | null) => (s === null ? null : s.replace(/\[[0-9;]*m/g, ''))
 
 function counts(over: Partial<Parameters<typeof formatCoherence>[0]> = {}) {
