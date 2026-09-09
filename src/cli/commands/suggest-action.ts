@@ -1,8 +1,9 @@
 import ora from 'ora'
 import chalk from 'chalk'
 import { gatherProjectContext, generateProposals } from '../../core/suggest-agent.js'
+import { describeEmptyProfile } from '../../core/project-context.js'
 import { findProjectRoot } from '../../core/resolver.js'
-import { printJson, printError } from '../ui/output.js'
+import { printJson, printError, printWarning } from '../ui/output.js'
 
 export async function runSuggest(options: {
   projectPath?: string
@@ -14,9 +15,22 @@ export async function runSuggest(options: {
 
     const spinner = options.json ? null : ora('Gathering project context...').start()
     const context = await gatherProjectContext(projectRoot)
+
+    // Saying nothing was found beats asking the model anyway. With no context it will still
+    // produce a confident list, and every name on it will be one it made up.
+    if (context.profile.isEmpty) {
+      if (spinner) spinner.stop()
+      if (options.json) {
+        printJson({ proposals: [], reason: 'no-project-context', projectRoot })
+      } else {
+        printWarning(describeEmptyProfile(context.profile))
+      }
+      return
+    }
+
     if (spinner) spinner.text = 'Generating skill proposals...'
 
-    const proposals = await generateProposals(context)
+    const proposals = await generateProposals(context.text)
     if (spinner) spinner.stop()
 
     if (options.json) {

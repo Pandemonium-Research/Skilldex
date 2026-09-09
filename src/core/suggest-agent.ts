@@ -1,7 +1,10 @@
-import { readFile, readdir } from 'node:fs/promises'
-import path from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ScopeLevel } from '../types/scope.js'
+import {
+  gatherProjectProfile,
+  renderProjectContext,
+  type ProjectProfile,
+} from './project-context.js'
 
 export interface SuggestionProposal {
   skillName: string
@@ -10,63 +13,36 @@ export interface SuggestionProposal {
   available: boolean
 }
 
-export async function gatherProjectContext(projectRoot: string): Promise<string> {
-  const parts: string[] = []
+export interface ProjectContext {
+  profile: ProjectProfile
+  /** The profile rendered for a prompt. Never send this to a model when `profile.isEmpty`. */
+  text: string
+}
 
-  // README
-  for (const name of ['README.md', 'README.txt', 'readme.md']) {
-    try {
-      const content = await readFile(path.join(projectRoot, name), 'utf8')
-      const excerpt = content.split('\n').slice(0, 100).join('\n')
-      parts.push(`## README (first 100 lines)\n${excerpt}`)
-      break
-    } catch {
-      // file not found
-    }
-  }
-
-  // package.json
-  try {
-    const pkgRaw = await readFile(path.join(projectRoot, 'package.json'), 'utf8')
-    const pkg = JSON.parse(pkgRaw)
-    const summary = {
-      name: pkg.name,
-      description: pkg.description,
-      scripts: pkg.scripts,
-      dependencies: Object.keys(pkg.dependencies ?? {}),
-      devDependencies: Object.keys(pkg.devDependencies ?? {}),
-    }
-    parts.push(`## package.json summary\n${JSON.stringify(summary, null, 2)}`)
-  } catch {
-    // not a Node project
-  }
-
-  // .claude directory listing
-  try {
-    const claudeDir = path.join(projectRoot, '.claude')
-    const entries = await readdir(claudeDir)
-    parts.push(`## .claude/ directory\n${entries.join('\n')}`)
-  } catch {
-    // no .claude dir
-  }
-
-  // Existing skills manifest
-  try {
-    const manifestPath = path.join(projectRoot, '.skilldex', 'skilldex.json')
-    const manifestRaw = await readFile(manifestPath, 'utf8')
-    const manifest = JSON.parse(manifestRaw)
-    const installedNames = Object.keys(manifest.skills ?? {})
-    if (installedNames.length > 0) {
-      parts.push(`## Already installed skills\n${installedNames.join(', ')}`)
-    }
-  } catch {
-    // no manifest yet
-  }
-
-  return parts.join('\n\n')
+/**
+ * What we know about the project, and how it reads as prompt text.
+ *
+ * The profile comes back alongside the text rather than being discarded, for two reasons: the
+ * caller has to decide whether there is enough here to ask a model anything at all, and the facts
+ * in it — dependency names, tooling — are what registry queries get built from, which re-parsing
+ * our own rendered prose could only lose.
+ */
+export async function gatherProjectContext(projectRoot: string): Promise<ProjectContext> {
+  const profile = await gatherProjectProfile(projectRoot)
+  return { profile, text: renderProjectContext(profile) }
 }
 
 export async function generateProposals(context: string): Promise<SuggestionProposal[]> {
+  // The bug this closes: the old gatherer returned '' for any project it did not recognise, the
+  // caller passed it straight through, and the model was asked to suggest skills for a project it
+  // had been told nothing about. It complied every time. Callers check `profile.isEmpty` and
+  // report properly; this is the backstop that keeps a future caller from reintroducing it.
+  if (!context.trim()) {
+    throw new Error(
+      'Refusing to generate suggestions with no project context — any result would be invented.'
+    )
+  }
+
   const { getConfigValue } = await import('./config.js')
   const apiKey = await getConfigValue('anthropicApiKey')
   // Bearer-token auth for custom/proxy endpoints (e.g. a LiteLLM proxy).

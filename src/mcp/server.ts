@@ -109,10 +109,29 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ projectPath }) => {
       const { gatherProjectContext, generateProposals } = await import('../core/suggest-agent.js')
+      const { describeEmptyProfile } = await import('../core/project-context.js')
       const { findProjectRoot } = await import('../core/resolver.js')
       const root = await findProjectRoot(projectPath ?? process.cwd())
       const context = await gatherProjectContext(root)
-      const proposals = await generateProposals(context)
+
+      // An agent reading this needs to be told the project was unreadable, not handed invented
+      // names it will then try to install.
+      if (context.profile.isEmpty) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                proposals: [],
+                reason: 'no-project-context',
+                detail: describeEmptyProfile(context.profile),
+              }),
+            },
+          ],
+        }
+      }
+
+      const proposals = await generateProposals(context.text)
       return {
         content: [{ type: 'text', text: JSON.stringify({ proposals }) }],
       }
