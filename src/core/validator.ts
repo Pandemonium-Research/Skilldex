@@ -56,7 +56,12 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     return fatal(skillPath, `SKILL.md not found in ${absPath}`)
   }
 
-  const lines = content.split('\n')
+  // Split on either line ending, for the reason spelled out in skillset-validator.ts: retained
+  // carriage returns reach the YAML parser through extractFrontmatter, where a quoted scalar
+  // followed by \r fails outright. A SKILL.md whose frontmatter ends on a quoted value scored 0
+  // on a CRLF checkout; most in this repo end on an unquoted one, which is the only reason this
+  // stayed hidden here while the skillset side broke.
+  const lines = content.split(/\r?\n/)
   const lineCount = lines.length
 
   // --- Check: YAML frontmatter parseable (25 pts) ---
