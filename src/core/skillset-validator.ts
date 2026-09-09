@@ -48,7 +48,12 @@ export async function validateSkillset(skillsetPath: string): Promise<SkillsetVa
     return fatal(skillsetPath, `SKILLSET.md not found in ${absPath}`)
   }
 
-  const lines = content.split('\n')
+  // Split on either line ending. Keeping the carriage returns fed them straight into the YAML
+  // parser via extractFrontmatter, and a quoted scalar followed by \r is a hard parse error
+  // ("Unexpected scalar at node end") rather than trailing whitespace. Since every official
+  // SKILLSET.md ends its frontmatter with a quoted spec_version, a CRLF checkout scored the lot
+  // 0/100 — visible only on Windows, and only for files git had actually rewritten.
+  const lines = content.split(/\r?\n/)
 
   // --- Check: YAML frontmatter parseable (25 pts) ---
   const { frontmatter, parseError } = extractFrontmatter(content, lines)
