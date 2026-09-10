@@ -9,11 +9,12 @@ import { resolveScope, resolveAllScopes } from '../core/resolver.js'
 import { readManifest } from '../core/manifest.js'
 import { isRegistryName, isGitSource } from '../core/source-kind.js'
 import { installFromGitUrl } from '../registry/sources/github.js'
+import { readBuildInfo } from '../core/build-info.js'
 
 export async function startMcpServer(): Promise<void> {
   const server = new McpServer({
     name: 'skilldex',
-    version: '0.1.0',
+    version: readBuildInfo().version,
   })
 
   // skilldex_validate
