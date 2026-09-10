@@ -6,6 +6,7 @@ import {
   type ProjectProfile,
 } from './project-context.js'
 import type { CandidatePool, SkillCandidate } from './suggest-retrieval.js'
+import { skillNameErrors } from './validator.js'
 
 /**
  * A skill the registry actually holds, proposed for this project.
@@ -341,16 +342,6 @@ export async function selectSkills(
   return { proposals: chosen, gaps: parseGaps(parsed.gaps, byName) }
 }
 
-/**
- * Skill names the validator will accept: kebab-case, and not reserved.
- *
- * Checked here rather than after generation because a gap with an invalid name produces a draft
- * that cannot pass validation however good its content is, and the failure would surface three
- * steps later attached to the wrong cause.
- */
-const KEBAB_CASE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-const RESERVED_NAME_WORDS = ['claude', 'anthropic']
-
 function parseGaps(raw: unknown, existing: Map<string, SkillCandidate>): SkillGap[] {
   if (!Array.isArray(raw)) return []
 
@@ -362,9 +353,10 @@ function parseGaps(raw: unknown, existing: Map<string, SkillCandidate>): SkillGa
     const { name, purpose, reason } = entry as Record<string, unknown>
     if (typeof name !== 'string') continue
 
+    // Checked against the validator's own rule rather than a copy of it: a gap whose name could
+    // never validate produces a draft that fails however good its content is.
     const slug = name.trim().toLowerCase()
-    if (!KEBAB_CASE.test(slug)) continue
-    if (RESERVED_NAME_WORDS.some((w) => slug.includes(w))) continue
+    if (skillNameErrors(slug).length > 0) continue
     if (seen.has(slug)) continue
 
     // A "gap" that names something already in the pool is not a gap. The model has the list in

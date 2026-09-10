@@ -15,6 +15,33 @@ const KEBAB_CASE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 // "claude" and "anthropic" are reserved and cannot appear in a skill name
 const RESERVED_NAME_WORDS = ['claude', 'anthropic']
 
+/**
+ * What is wrong with a skill name, if anything.
+ *
+ * Exported because three places need this rule and only one of them is the validator: `skillpm
+ * init` has to reject a bad name before scaffolding a directory around it, and `suggest` has to
+ * drop a proposed gap whose name could never pass — a draft named `Experiment Record` cannot
+ * validate however good its contents are, and the failure would surface later attached to the
+ * wrong cause.
+ *
+ * One copy, deliberately. This repo already has a scar from the same rule living in three files
+ * (see `source-kind.ts`), where fixing one left the other two broken.
+ */
+export function skillNameErrors(name: string): string[] {
+  const errors: string[] = []
+
+  if (!KEBAB_CASE.test(name)) {
+    errors.push(`name "${name}" is not kebab-case — use lowercase letters, digits, and hyphens only`)
+  }
+
+  const reserved = RESERVED_NAME_WORDS.find((w) => name.toLowerCase().includes(w))
+  if (reserved) {
+    errors.push(`name contains reserved word "${reserved}" — "claude" and "anthropic" are reserved`)
+  }
+
+  return errors
+}
+
 // Scoring weights — derived from a 2-axis spec rubric (mandate x failure impact),
 // normalized to 100. See docs/validation.md "How the weights were derived".
 const WEIGHTS = {
@@ -112,18 +139,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
       })
 
       // --- Check: name format — kebab-case + not reserved (11 pts) ---
-      const nameErrors: string[] = []
-      if (!KEBAB_CASE.test(nameValue)) {
-        nameErrors.push(
-          `name "${nameValue}" is not kebab-case — use lowercase letters, digits, and hyphens only`
-        )
-      }
-      const reserved = RESERVED_NAME_WORDS.find((w) => nameValue.toLowerCase().includes(w))
-      if (reserved) {
-        nameErrors.push(
-          `name contains reserved word "${reserved}" — "claude" and "anthropic" are reserved`
-        )
-      }
+      const nameErrors = skillNameErrors(nameValue)
       if (nameErrors.length > 0) {
         for (const message of nameErrors) {
           diagnostics.push({ severity: 'error', line: nameLine, message, check: 'name-format' })
