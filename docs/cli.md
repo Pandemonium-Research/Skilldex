@@ -13,7 +13,7 @@ spm     <command> [options]
 |---|---|
 | `--json` | Output raw JSON to stdout. Suppresses spinners and color. Useful for scripting. |
 | `--no-color` | Disable chalk color output |
-| `-v, --version` | Print version and exit |
+| `-V, --version` | Print the version this build was made at, and exit. From a git checkout whose `dist/` is older than `HEAD`, also warns on stderr |
 | `-h, --help` | Show help |
 
 ---

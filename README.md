@@ -66,6 +66,10 @@ npm run build
 npm link           # makes skillpm / spm available globally
 ```
 
+A linked `skillpm` runs whatever is in `dist/`, so rebuild after pulling (`npm run build`).
+`skillpm --version` reports the version the build was made at, and warns if the checkout has
+moved on since.
+
 Both `skillpm` and `spm` are identical — `spm` is a convenience alias:
 
 ```bash
@@ -216,7 +220,7 @@ Full reference: [docs/cli.md](docs/cli.md)
 |---|---|
 | `--json` | Machine-readable JSON output |
 | `--no-color` | Disable colored output |
-| `-v, --version` | Print version |
+| `-V, --version` | Print the version this build was made at |
 | `-h, --help` | Show help |
 
 ---

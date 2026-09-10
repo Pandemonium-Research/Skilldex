@@ -14,6 +14,11 @@ npm test
 
 **Requirements:** Node.js 20+, npm 9+
 
+`npm install` builds too, through the `prepare` script. Nothing rebuilds on `git pull`, though —
+if you use a linked `skillpm` (`npm link`), run `npm run build` after pulling, or it keeps running
+the old `dist/`. `skillpm --version` tells you: it prints the version the build was made at, not
+what `package.json` says now, and warns when the checkout has moved past the build.
+
 To use the CLI during development without installing globally:
 
 ```bash
@@ -111,8 +116,9 @@ The project uses `"type": "module"` in `package.json`. All TypeScript imports mu
 
 | Script | What it does |
 |---|---|
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm run build:watch` | Watch mode compilation |
+| `npm run build` | Compile TypeScript to `dist/`, then record the version and commit in `dist/build-info.json` (`scripts/write-build-info.mjs`) |
+| `npm run build:watch` | Watch mode compilation. Does not rewrite `build-info.json` — run `npm run build` once afterwards |
+| `prepare` | Runs `npm run build` on `npm install` and `npm link` |
 | `npm test` | Run all tests once with vitest |
 | `npm run test:watch` | Watch mode tests |
 | `npm run test:coverage` | Run tests and emit coverage report |
