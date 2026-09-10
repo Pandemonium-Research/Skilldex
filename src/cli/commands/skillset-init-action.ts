@@ -1,7 +1,8 @@
-import { mkdir, writeFile, stat } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { printError, printSuccess, printInfo } from '../ui/output.js'
 import { SKILLSET_SPEC_VERSION } from '../../core/skillset-validator.js'
+import { exists } from '../../core/fs-exists.js'
 
 // Interpolated rather than written out, so the scaffold cannot fall behind the spec the
 // validator implements — which is how it came to declare 1.0 while everything else moved to 1.1.
@@ -34,22 +35,17 @@ export async function runSkillsetInit(name?: string): Promise<void> {
 
   try {
     if (name) {
-      try {
-        await stat(targetDir)
+      if (await exists(targetDir)) {
         printError(`Directory "${skillsetName}" already exists`)
         process.exit(1)
-      } catch {
-        await mkdir(targetDir, { recursive: true })
       }
+      await mkdir(targetDir, { recursive: true })
     }
 
     const skillsetMdPath = path.join(targetDir, 'SKILLSET.md')
-    try {
-      await stat(skillsetMdPath)
+    if (await exists(skillsetMdPath)) {
       printError('SKILLSET.md already exists in this directory')
       process.exit(1)
-    } catch {
-      // good — doesn't exist yet
     }
 
     await writeFile(skillsetMdPath, TEMPLATE(skillsetName), 'utf8')

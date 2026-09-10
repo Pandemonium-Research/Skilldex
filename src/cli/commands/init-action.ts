@@ -1,7 +1,8 @@
-import { mkdir, writeFile, stat } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { printError, printSuccess, printInfo } from '../ui/output.js'
 import { SPEC_VERSION, skillNameErrors } from '../../core/validator.js'
+import { exists } from '../../core/fs-exists.js'
 
 /**
  * Scaffold a single skill, the counterpart to `skillpm skillset init`.
@@ -47,23 +48,6 @@ Say what situation should trigger the skill.
 
 Anything the agent needs to know that is not a step — constraints, common mistakes, edge cases.
 `
-
-/**
- * Existence as a value, rather than as control flow.
- *
- * The obvious shape — `try { await stat(p); bail() } catch { proceed }` — puts the bail inside a
- * try whose catch means "not there". `process.exit` throws before it terminates, so under any
- * harness that stubs exit the bail is swallowed and the code proceeds to overwrite the very file
- * it was checking for. It only looks safe because exit normally ends the process first.
- */
-async function exists(target: string): Promise<boolean> {
-  try {
-    await stat(target)
-    return true
-  } catch {
-    return false
-  }
-}
 
 export async function runInit(name?: string): Promise<void> {
   const skillName = name ?? path.basename(process.cwd())
