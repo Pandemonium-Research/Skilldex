@@ -31,10 +31,29 @@ import type { RegistrySkill } from '../registry/sources/registry.js'
 /** Registry search is the slow path; a straggler past this is dropped, not waited on. */
 const QUERY_TIMEOUT_MS = 25_000
 
-/** Results per query. Enough to rank within, small enough to keep the response quick. */
+/**
+ * Results per query — a constant, and it must stay one.
+ *
+ * The registry caches on the exact `(q, limit)` pair. If this varied by anything — a caller's
+ * preference, the number of proposals wanted, configuration — then no two runs would ever share a
+ * cache entry and every fan-out would be all-cold forever. Cold is 3.3s to 21s per query and warm
+ * is 0.12s, so the difference between pinning this and not is roughly two orders of magnitude on
+ * the second run. Deliberately not a parameter.
+ *
+ * The value itself only has to be enough to rank within and small enough to stay quick.
+ */
 const RESULTS_PER_QUERY = 10
 
-/** Queries per fan-out. They run concurrently, so this bounds load rather than latency. */
+/**
+ * Queries per fan-out.
+ *
+ * They run concurrently, so this bounds load rather than latency — a fan-out ends when its
+ * *slowest* member does. Drawing eight times from a distribution with a 3.3s–21s body and a tail
+ * that hits the platform ceiling, expect the whole fan-out to sit near the timeout most of the
+ * time rather than near the median query. Measured on this CLI's own repo: eight queries, 14.9s
+ * total, set entirely by `commander` and `yaml` at 14.9s each while five others finished under
+ * 2s.
+ */
 const MAX_QUERIES = 8
 
 export interface SkillCandidate {
@@ -80,8 +99,11 @@ export interface CandidatePool {
  * a bug: this project's own research repo produces the single seed `python`. Callers that need
  * more have to derive it from prose, which needs a model, which is why this function does not.
  */
-export function buildQueries(profile: ProjectProfile, limit: number = MAX_QUERIES): string[] {
-  return profile.keywords.slice(0, limit)
+export function buildQueries(profile: ProjectProfile, max: number = MAX_QUERIES): string[] {
+  // Named `max`, not `limit`: `limit` in this file means the registry's per-query result limit,
+  // which is pinned precisely so it cannot vary. Two different limits sharing one name is how the
+  // pinned one stops being pinned.
+  return profile.keywords.slice(0, max)
 }
 
 /** One search, bounded in time, never throwing. */

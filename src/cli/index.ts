@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { createRequire } from 'node:module'
+import { registerInit } from './commands/init.js'
 import { registerInstall } from './commands/install.js'
 import { registerUninstall } from './commands/uninstall.js'
 import { registerList } from './commands/list.js'
@@ -23,6 +24,7 @@ export function createCli(): Command {
     .version(version)
     .option('--no-color', 'Disable colored output')
 
+  registerInit(program)
   registerInstall(program)
   registerUninstall(program)
   registerUpdate(program)

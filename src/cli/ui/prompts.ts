@@ -13,8 +13,13 @@ export async function promptSuggestions(
 ): Promise<ApprovedSkill[]> {
   console.log(chalk.bold('\nProposed skills for this project:'))
   proposals.forEach((p, i) => {
+    // Identified by owner/name, because a bare name does not identify a skill: ten owners publish
+    // one called `terraform`, and the qualified form is the one that installs.
+    const score = p.score === null ? '' : chalk.dim(`  ${p.score}/100`)
     console.log(
-      `  ${chalk.dim(`${i + 1}.`)} ${chalk.cyan(p.skillName.padEnd(30))} ${chalk.dim(`[${p.suggestedScope}]`)}`
+      `  ${chalk.dim(`${i + 1}.`)} ${chalk.cyan(p.qualifiedName.padEnd(38))} ${chalk.dim(
+        `[${p.suggestedScope}]`
+      )}${score}`
     )
     console.log(`     ${chalk.dim(p.reason)}`)
   })
@@ -24,7 +29,7 @@ export async function promptSuggestions(
 
   for (const proposal of proposals) {
     const action = await select({
-      message: `${chalk.cyan(proposal.skillName)}: Install?`,
+      message: `${chalk.cyan(proposal.qualifiedName)}: Install?`,
       choices: [
         { name: 'Yes (project scope)', value: 'project' },
         { name: 'Yes (shared scope)', value: 'shared' },
