@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { simpleGit } from 'simple-git'
 import { parse as parseYaml } from 'yaml'
@@ -58,9 +58,14 @@ export async function detectSourceUrl(dir: string): Promise<string | null> {
       .replace(/^git@github\.com:/, 'https://github.com/')
       .replace(/\.git$/, '')
 
-    const root = (await git.revparse(['--show-toplevel'])).trim()
+    // Both ends through realpath. git reports the top level with symlinks resolved, while `dir`
+    // arrives however the caller spelt it. Compared unresolved, a subdirectory reached through any
+    // link — a symlinked projects folder, or on macOS the temp directory itself (/var is a link to
+    // /private/var) — looked like it sat outside the repository, and the bare remote went to the
+    // registry: the root-URL bug this function exists to fix, back by another route.
+    const root = await realpath((await git.revparse(['--show-toplevel'])).trim())
     const subpath = path
-      .relative(path.resolve(root), path.resolve(dir))
+      .relative(root, await realpath(dir))
       .split(path.sep)
       .filter(Boolean)
       .join('/')

@@ -12,7 +12,7 @@
  * `git` output and a mock of it would only assert that the mock matches the code.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, mkdir, writeFile, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { simpleGit } from 'simple-git'
@@ -44,6 +44,20 @@ afterAll(async () => {
 })
 
 describe('detectSourceUrl', () => {
+  it('keeps the subdirectory when the repository is reached through a symlink', async () => {
+    // git reports the top level with links resolved; the caller's path need not be. On macOS the
+    // temp directory alone is such a path (/var -> /private/var), so the cases below failed only
+    // there — this one makes the link explicitly, so every platform checks it.
+    const parent = await mkdtemp(path.join(tmpdir(), 'publish-source-link-'))
+    const link = path.join(parent, 'repo')
+    try {
+      await symlink(repo, link, 'junction') // 'junction' is ignored off Windows
+      expect(await detectSourceUrl(path.join(link, 'developer'))).toBe(`${REMOTE}/tree/main/developer`)
+    } finally {
+      await rm(parent, { recursive: true, force: true })
+    }
+  })
+
   it('points at the subdirectory the artifact actually lives in', async () => {
     // The whole bug: without the subpath the registry fetches SKILLSET.md from the repo root and
     // 404s, which surfaces as an unexplained 422 at publish time.
