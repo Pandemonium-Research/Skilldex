@@ -172,7 +172,17 @@ async function bridgeOwnership(
   if (!stats.isDirectory()) return null
 
   const marked = await markedSource(entry)
-  return marked !== null && samePath(marked, source) ? 'copy' : null
+  if (marked === null) return null
+  if (samePath(marked, source)) return 'copy'
+  // As for a link, ask the filesystem whether the two name one directory. A string comparison
+  // cannot know that the same install was reached another way — through a symlinked directory,
+  // or on a case-insensitive disk that is not Windows (macOS's default) through a
+  // differently-cased path. realpath throws when either end is gone: cannot prove ownership, null.
+  try {
+    return samePath(await realpath(marked), await realpath(source)) ? 'copy' : null
+  } catch {
+    return null
+  }
 }
 
 /** Copy the skill and record where it came from, so it can be recognised later. */

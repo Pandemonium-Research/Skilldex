@@ -69,6 +69,24 @@ const canLink = await (async () => {
   }
 })()
 
+/**
+ * Whether the temp filesystem folds case. Probed rather than inferred from the platform: macOS's
+ * default APFS is case-insensitive like Windows, while Linux and case-sensitive APFS are not.
+ * Keying these tests on `process.platform` asserted case-sensitive behaviour on every Mac.
+ */
+const caseInsensitive = await (async () => {
+  const probe = await mkdtemp(path.join(os.tmpdir(), 'skilldex-case-probe-'))
+  try {
+    await writeFile(path.join(probe, 'case'), '')
+    await lstat(path.join(probe, 'CASE'))
+    return true
+  } catch {
+    return false
+  } finally {
+    await rm(probe, { recursive: true, force: true })
+  }
+})()
+
 const MARKER = '.skilldex-bridge.json'
 
 let tmp: string
@@ -289,10 +307,11 @@ describe('unbridgeSkill', () => {
     }
   })
 
-  it.runIf(process.platform === 'win32')(
+  it.runIf(caseInsensitive)(
     'recognises its own bridge through a differently-cased path',
     async () => {
-      // C:\Users\… and c:\users\… are one directory on Windows, so comparing the strings
+      // C:\Users\… and c:\users\… are one directory on Windows — and on macOS's default disk the
+      // same holds for any path — so comparing the strings
       // literally would call our own bridge somebody else's and refuse to remove it. This is not
       // hypothetical: the same oversight elsewhere in this project produced a confident, wrong
       // claim about which install was in use.
@@ -308,7 +327,7 @@ describe('unbridgeSkill', () => {
     }
   )
 
-  it.skipIf(process.platform === 'win32')(
+  it.skipIf(caseInsensitive)(
     'treats a differently-cased path as a different install where case matters',
     async () => {
       // The other half of the same rule. On a case-sensitive filesystem these really are two
@@ -318,6 +337,31 @@ describe('unbridgeSkill', () => {
       const removed = await unbridgeSkill('demo-skill', installed.toUpperCase(), 'project', tmp)
 
       expect(removed).toHaveLength(0)
+    }
+  )
+
+  it.runIf(canLink)(
+    'recognises a copied bridge when the install is reached through a symlinked path',
+    async () => {
+      // A copy is recognised by the source recorded in its marker, and that was a bare string
+      // comparison — so the same install reached another way looked like someone else's and was
+      // left behind on uninstall. It now asks the filesystem, as the link branch already did.
+      const aliasParent = await mkdtemp(path.join(os.tmpdir(), 'skilldex-bridge-alias-'))
+      const alias = path.join(aliasParent, 'root')
+      try {
+        await makeLink(tmp, alias)
+        mocks.forceEperm = true
+        await bridgeSkill('demo-skill', installed, 'project', tmp)
+        mocks.forceEperm = false
+
+        const throughAlias = path.join(alias, path.relative(tmp, installed))
+        const removed = await unbridgeSkill('demo-skill', throughAlias, 'project', tmp)
+
+        expect(removed).toHaveLength(2)
+      } finally {
+        mocks.forceEperm = false
+        await rm(aliasParent, { recursive: true, force: true })
+      }
     }
   )
 
