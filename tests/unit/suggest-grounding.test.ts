@@ -148,7 +148,7 @@ describe('selecting from the pool', () => {
       })
     )
 
-    const [proposal] = await selectSkills(CONTEXT, [candidate()], { complete })
+    const [proposal] = (await selectSkills(CONTEXT, [candidate()], { complete })).proposals
 
     expect(proposal).toEqual({
       qualifiedName: 'mauromedda/terraform',
@@ -169,7 +169,7 @@ describe('selecting from the pool', () => {
       '{"proposals": [{"qualifiedName": "acme/invented-skill", "reason": "made up"}]}'
     )
 
-    expect(await selectSkills(CONTEXT, [candidate()], { complete })).toEqual([])
+    expect((await selectSkills(CONTEXT, [candidate()], { complete })).proposals).toEqual([])
   })
 
   it('drops a bare name even when a skill of that name is in the pool', async () => {
@@ -177,7 +177,7 @@ describe('selecting from the pool', () => {
     // install. Reattaching it to an arbitrary pool entry would pick an owner at random.
     const complete = replying('{"proposals": [{"qualifiedName": "terraform", "reason": "IaC"}]}')
 
-    expect(await selectSkills(CONTEXT, [candidate()], { complete })).toEqual([])
+    expect((await selectSkills(CONTEXT, [candidate()], { complete })).proposals).toEqual([])
   })
 
   it('keeps the valid choices when only some are invented', async () => {
@@ -187,7 +187,7 @@ describe('selecting from the pool', () => {
         '{"qualifiedName": "mauromedda/terraform", "reason": "yes"}]}'
     )
 
-    const chosen = await selectSkills(CONTEXT, [candidate()], { complete })
+    const chosen = (await selectSkills(CONTEXT, [candidate()], { complete })).proposals
 
     expect(chosen.map((c) => c.qualifiedName)).toEqual(['mauromedda/terraform'])
   })
@@ -199,13 +199,13 @@ describe('selecting from the pool', () => {
         '{"qualifiedName": "mauromedda/terraform", "reason": "two"}]}'
     )
 
-    expect(await selectSkills(CONTEXT, [candidate()], { complete })).toHaveLength(1)
+    expect((await selectSkills(CONTEXT, [candidate()], { complete })).proposals).toHaveLength(1)
   })
 
   it('falls back to the registry description when no reason is given', async () => {
     const complete = replying('{"proposals": [{"qualifiedName": "mauromedda/terraform"}]}')
 
-    const [proposal] = await selectSkills(CONTEXT, [candidate()], { complete })
+    const [proposal] = (await selectSkills(CONTEXT, [candidate()], { complete })).proposals
 
     expect(proposal.reason).toBe('Production-quality Terraform.')
   })
@@ -215,7 +215,7 @@ describe('selecting from the pool', () => {
       '{"proposals": [{"qualifiedName": "mauromedda/terraform", "suggestedScope": "everywhere"}]}'
     )
 
-    const [proposal] = await selectSkills(CONTEXT, [candidate()], { complete })
+    const [proposal] = (await selectSkills(CONTEXT, [candidate()], { complete })).proposals
 
     expect(proposal.suggestedScope).toBe('project')
   })
@@ -225,7 +225,7 @@ describe('selecting from the pool', () => {
       '{"proposals": [{"qualifiedName": "mauromedda/terraform", "suggestedScope": "global"}]}'
     )
 
-    const [proposal] = await selectSkills(CONTEXT, [candidate()], { complete })
+    const [proposal] = (await selectSkills(CONTEXT, [candidate()], { complete })).proposals
 
     expect(proposal.suggestedScope).toBe('global')
   })
@@ -234,13 +234,13 @@ describe('selecting from the pool', () => {
     // "None of these fit" is useful and must not be turned into a suggestion.
     const complete = replying('{"proposals": []}')
 
-    expect(await selectSkills(CONTEXT, [candidate()], { complete })).toEqual([])
+    expect((await selectSkills(CONTEXT, [candidate()], { complete })).proposals).toEqual([])
   })
 
   it('does not call the model at all when the pool is empty', async () => {
     const complete = replying('{"proposals": []}')
 
-    expect(await selectSkills(CONTEXT, [], { complete })).toEqual([])
+    expect(await selectSkills(CONTEXT, [], { complete })).toEqual({ proposals: [], gaps: [] })
     expect(complete).not.toHaveBeenCalled()
   })
 
@@ -256,6 +256,78 @@ describe('selecting from the pool', () => {
     expect(system.toLowerCase()).not.toContain('verified')
   })
 })
+
+describe('gaps — skills that do not exist yet', () => {
+  const withGaps = (gaps: unknown) => replying(JSON.stringify({ proposals: [], gaps }))
+
+  it('returns them separately from proposals, never merged', async () => {
+    // Keeping them apart is the point. One list where some entries install and some do not is
+    // exactly how the original command read.
+    const complete = withGaps([
+      { name: 'experiment-record', purpose: 'Fill in RECORD.md', reason: 'Every run needs one' },
+    ])
+
+    const result = await selectSkills(CONTEXT, [candidate()], { complete })
+
+    expect(result.proposals).toEqual([])
+    expect(result.gaps).toEqual([
+      { name: 'experiment-record', purpose: 'Fill in RECORD.md', reason: 'Every run needs one' },
+    ])
+  })
+
+  it('rejects a name the validator would reject', async () => {
+    // A gap whose name is not kebab-case yields a draft that cannot pass validation however good
+    // its content is, and the failure would surface later blamed on the wrong thing.
+    const complete = withGaps([
+      { name: 'Experiment Record', purpose: 'p', reason: 'r' },
+      { name: 'experiment_record', purpose: 'p', reason: 'r' },
+      { name: 'valid-name', purpose: 'p', reason: 'r' },
+    ])
+
+    const { gaps } = await selectSkills(CONTEXT, [candidate()], { complete })
+
+    expect(gaps.map((g) => g.name)).toEqual(['valid-name'])
+  })
+
+  it('rejects reserved words in a name', async () => {
+    const complete = withGaps([
+      { name: 'claude-helper', purpose: 'p', reason: 'r' },
+      { name: 'anthropic-tools', purpose: 'p', reason: 'r' },
+      { name: 'fine-name', purpose: 'p', reason: 'r' },
+    ])
+
+    const { gaps } = await selectSkills(CONTEXT, [candidate()], { complete })
+
+    expect(gaps.map((g) => g.name)).toEqual(['fine-name'])
+  })
+
+  it('drops a "gap" that is already in the pool', async () => {
+    // The model has the list in front of it and still sometimes proposes writing one of them.
+    const complete = withGaps([
+      { name: 'terraform', purpose: 'p', reason: 'r' },
+      { name: 'something-else', purpose: 'p', reason: 'r' },
+    ])
+
+    const { gaps } = await selectSkills(CONTEXT, [candidate()], { complete })
+
+    expect(gaps.map((g) => g.name)).toEqual(['something-else'])
+  })
+
+  it('caps how many it will take', async () => {
+    const complete = withGaps(
+      Array.from({ length: 8 }, (_, i) => ({ name: `gap-${i}`, purpose: 'p', reason: 'r' }))
+    )
+
+    expect((await selectSkills(CONTEXT, [candidate()], { complete })).gaps).toHaveLength(3)
+  })
+
+  it('is empty when the model offers none', async () => {
+    const complete = replying('{"proposals": []}')
+
+    expect((await selectSkills(CONTEXT, [candidate()], { complete })).gaps).toEqual([])
+  })
+})
+
 
 describe('the whole pipeline', () => {
   function fakeSearch(table: Record<string, RegistrySkill[]>) {

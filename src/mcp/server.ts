@@ -166,7 +166,7 @@ export async function startMcpServer(): Promise<void> {
         }
       }
 
-      const { proposals, pool, queries } = await suggestForProject(context.profile)
+      const { proposals, gaps, pool, queries } = await suggestForProject(context.profile)
 
       return {
         content: [
@@ -175,6 +175,9 @@ export async function startMcpServer(): Promise<void> {
             text: JSON.stringify({
               // Every qualifiedName here is installable as-is via skilldex_install.
               proposals,
+              // Skills the registry does not have. These name nothing installable and are kept in
+              // their own field so an agent cannot mistake one for a proposal and try.
+              gaps,
               queries,
               // Searches that failed are reported, not swallowed. An agent seeing two proposals
               // should be able to tell "little fits this project" from "half the searches timed

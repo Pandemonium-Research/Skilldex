@@ -196,9 +196,39 @@ export async function proposeQueries(
   return queries
 }
 
-// --- Call two: which of the found skills to propose ---
+/**
+ * A skill this project wants that the registry does not have.
+ *
+ * Deliberately not a `SuggestionProposal`: it names nothing installable, and conflating the two is
+ * how the original defect read to a user — a list where some entries existed and some did not,
+ * with nothing to tell them apart. A gap is a proposal to *write* something, and the UI says so.
+ */
+export interface SkillGap {
+  /** kebab-case, validator-legal. Becomes the directory and the frontmatter `name`. */
+  name: string
+  purpose: string
+  reason: string
+}
+
+export interface SelectionResult {
+  proposals: SuggestionProposal[]
+  gaps: SkillGap[]
+}
+
+// --- Call two: which of the found skills to propose, and what is missing ---
 
 const MAX_SELECTED = 7
+const MAX_GAPS = 3
+
+/**
+ * How many candidates the selection prompt carries.
+ *
+ * Measured end to end against a real model, the whole 64-candidate pool inlined produced a
+ * 37,800-character prompt, which dominates the cost of the run. The pool is already ranked, so
+ * truncating costs very little — the entries beyond this are the ones a single query returned at
+ * a poor position.
+ */
+const MAX_CANDIDATES_IN_PROMPT = 40
 
 const SELECTION_SYSTEM_PROMPT = `You are recommending Claude Code skills for a project.
 
@@ -212,17 +242,32 @@ Respond ONLY with valid JSON:
       "reason": "one sentence on why this skill fits this project",
       "suggestedScope": "project" | "shared" | "global"
     }
+  ],
+  "gaps": [
+    {
+      "name": "kebab-case-name",
+      "purpose": "one sentence on what this skill would do",
+      "reason": "one sentence on why this project needs it"
+    }
   ]
 }
 
-Rules:
+Rules for "proposals" — skills that already exist:
 - Choose ONLY from the list. Never invent a name, never alter one, never combine two.
 - Copy qualifiedName character for character, including the owner prefix.
 - Choose at most 7, and fewer is better. Many listed skills will be irrelevant — a skill merely
   named after one of the project's dependencies is usually not useful to a project that uses it.
 - If nothing in the list genuinely fits, return an empty list. That is a valid and useful answer.
 - suggestedScope is "project" unless there is a clear reason otherwise.
-- Keep each reason to one sentence.`
+
+Rules for "gaps" — skills that do NOT exist and would have to be written:
+- At most 3, and only where the need is specific to this project and genuinely unmet by the list.
+- Do not restate something already covered by a proposal.
+- "name" must be kebab-case: lowercase letters and digits separated by single hyphens. It must not
+  contain the words "claude" or "anthropic", which are reserved.
+- Return an empty list if the listed skills cover this project well. That is the common case.
+
+Keep every reason and purpose to one sentence.`
 
 function renderCandidates(candidates: SkillCandidate[]): string {
   return candidates
@@ -250,19 +295,19 @@ export async function selectSkills(
   context: string,
   candidates: SkillCandidate[],
   options: { complete?: Complete } = {}
-): Promise<SuggestionProposal[]> {
+): Promise<SelectionResult> {
   requireContext(context)
-  if (candidates.length === 0) return []
+  if (candidates.length === 0) return { proposals: [], gaps: [] }
 
   const complete = options.complete ?? defaultComplete
   const reply = await complete(
     SELECTION_SYSTEM_PROMPT,
     `Project context:\n\n${context}\n\nSkills available in the registry:\n\n${renderCandidates(
-      candidates
-    )}\n\nWhich of these fit this project?`
+      candidates.slice(0, MAX_CANDIDATES_IN_PROMPT)
+    )}\n\nWhich of these fit this project, and what is missing?`
   )
 
-  const parsed = parseJsonReply<{ proposals?: unknown }>(reply)
+  const parsed = parseJsonReply<{ proposals?: unknown; gaps?: unknown }>(reply)
   const raw = Array.isArray(parsed.proposals) ? parsed.proposals : []
 
   const byName = new Map(candidates.map((c) => [c.qualifiedName, c]))
@@ -293,11 +338,139 @@ export async function selectSkills(
     if (chosen.length >= MAX_SELECTED) break
   }
 
-  return chosen
+  return { proposals: chosen, gaps: parseGaps(parsed.gaps, byName) }
+}
+
+/**
+ * Skill names the validator will accept: kebab-case, and not reserved.
+ *
+ * Checked here rather than after generation because a gap with an invalid name produces a draft
+ * that cannot pass validation however good its content is, and the failure would surface three
+ * steps later attached to the wrong cause.
+ */
+const KEBAB_CASE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const RESERVED_NAME_WORDS = ['claude', 'anthropic']
+
+function parseGaps(raw: unknown, existing: Map<string, SkillCandidate>): SkillGap[] {
+  if (!Array.isArray(raw)) return []
+
+  const gaps: SkillGap[] = []
+  const seen = new Set<string>()
+
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue
+    const { name, purpose, reason } = entry as Record<string, unknown>
+    if (typeof name !== 'string') continue
+
+    const slug = name.trim().toLowerCase()
+    if (!KEBAB_CASE.test(slug)) continue
+    if (RESERVED_NAME_WORDS.some((w) => slug.includes(w))) continue
+    if (seen.has(slug)) continue
+
+    // A "gap" that names something already in the pool is not a gap. The model has the list in
+    // front of it and still occasionally proposes writing one of them.
+    if ([...existing.values()].some((c) => c.name.toLowerCase() === slug)) continue
+
+    seen.add(slug)
+    gaps.push({
+      name: slug,
+      purpose: typeof purpose === 'string' ? purpose.trim() : '',
+      reason: typeof reason === 'string' ? reason.trim() : '',
+    })
+
+    if (gaps.length >= MAX_GAPS) break
+  }
+
+  return gaps
 }
 
 function isScope(value: unknown): value is ScopeLevel {
   return value === 'project' || value === 'shared' || value === 'global'
+}
+
+// --- Call three: write the skill that does not exist yet ---
+
+/**
+ * What the validator enforces, stated to the model rather than discovered by failing.
+ *
+ * These are read off `src/core/validator.ts` and must track it. The 30-word description floor is
+ * the one a generator reliably misses — a model writes a crisp one-line description because that
+ * reads better, and scores zero on `description-length` for it.
+ */
+const DRAFT_SYSTEM_PROMPT = `You are writing a Claude Code skill: a single SKILL.md file.
+
+A skill gives an AI coding agent a specific capability. It is read into the agent's context, so it
+must be direct, concrete and free of filler.
+
+Respond with the COMPLETE file content and nothing else — no code fence, no commentary.
+
+The file must be exactly this shape:
+
+---
+name: kebab-case-name
+description: "what it does and when the agent should use it"
+version: "1.0.0"
+tags: []
+spec_version: "1.0"
+---
+
+# Title
+
+The actual instructions the agent should follow.
+
+Hard requirements — the file is rejected otherwise:
+- YAML frontmatter first, opened and closed with ---
+- name: lowercase letters and digits separated by single hyphens. Must not contain "claude" or
+  "anthropic", which are reserved.
+- description: AT LEAST 30 WORDS and at most 1024 characters. Say what the skill does and when to
+  use it. A single short sentence will be rejected.
+- The description MUST be wrapped in double quotes, and must not contain a double quote, a colon
+  followed by a space, or angle brackets (< >). Unquoted punctuation makes the frontmatter
+  unparseable and the whole file scores zero.
+- The whole file must be under 400 lines.
+
+Write instructions an agent can act on: concrete steps, rules and examples. Do not describe the
+skill in the third person, and do not pad it to reach a length.`
+
+/**
+ * Generate the content of a SKILL.md for a gap.
+ *
+ * `diagnostics` carries validator errors from a previous attempt. Feeding them back is worth one
+ * retry and no more: a model that has been told the description is 12 words and must be 30 will
+ * usually fix it, and one that fails twice is failing for a reason another round will not reach.
+ */
+export async function generateSkillDraft(
+  context: string,
+  gap: SkillGap,
+  options: { complete?: Complete; diagnostics?: string[] } = {}
+): Promise<string> {
+  requireContext(context)
+
+  const complete = options.complete ?? defaultComplete
+  const repair = options.diagnostics?.length
+    ? `\n\nA previous attempt was REJECTED for these reasons. Fix every one:\n${options.diagnostics
+        .map((d) => `- ${d}`)
+        .join('\n')}`
+    : ''
+
+  const reply = await complete(
+    DRAFT_SYSTEM_PROMPT,
+    `Project context:\n\n${context}\n\nWrite a skill named "${gap.name}".\n` +
+      `What it should do: ${gap.purpose}\n` +
+      `Why this project needs it: ${gap.reason}${repair}`
+  )
+
+  return stripCodeFence(reply)
+}
+
+/**
+ * Models wrap file content in a fence despite being told not to. Unwrap rather than reject: the
+ * content is right and the envelope is cosmetic, and a rejection here costs another generation.
+ */
+function stripCodeFence(reply: string): string {
+  const trimmed = reply.trim()
+  const fenced = trimmed.match(/^```(?:markdown|md|yaml)?\n([\s\S]*?)\n?```$/)
+  return (fenced ? fenced[1] : trimmed).trim() + '\n'
 }
 
 // --- The whole pipeline ---
@@ -323,6 +496,8 @@ export interface SuggestionRun {
     used: string[]
   }
   proposals: SuggestionProposal[]
+  /** Skills this project wants that the registry does not have. Often empty. */
+  gaps: SkillGap[]
 }
 
 /**
@@ -365,7 +540,7 @@ export async function suggestForProject(
     search: options.search,
   })
 
-  const proposals = await selectSkills(context, pool.candidates, options)
+  const { proposals, gaps } = await selectSkills(context, pool.candidates, options)
 
-  return { profile, pool, queries: { deterministic, proposed, used }, proposals }
+  return { profile, pool, queries: { deterministic, proposed, used }, proposals, gaps }
 }
