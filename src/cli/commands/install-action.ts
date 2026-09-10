@@ -80,8 +80,58 @@ async function runRegistryInstall(
 ): Promise<void> {
   const spinner = options.json ? null : ora(`Looking up "${name}" in registry...`).start()
   try {
-    const { getSkillInstallInfo } = await import('../../registry/sources/registry.js')
-    const info = await getSkillInstallInfo(name)
+    const { getSkillInstallInfo, isAmbiguousNameError, MAX_REPORTED_OWNERS } = await import(
+      '../../registry/sources/registry.js'
+    )
+
+    let info
+    try {
+      info = await getSkillInstallInfo(name)
+    } catch (e) {
+      if (!isAmbiguousNameError(e)) throw e
+
+      // A bare name claimed by several owners. The registry says so and names them — but what it
+      // suggests in prose is an HTTP path, `use /skills/{owner}/<name>/install`, which is not
+      // something anyone can type into this CLI. The owners are right there in the error, so
+      // offer them instead of reprinting a URL.
+      const candidates = e.owners.map((owner) => `${owner}/${name}`)
+      const mayBeTruncated = e.owners.length >= MAX_REPORTED_OWNERS
+
+      if (options.json) {
+        if (spinner) spinner.stop()
+        printJson({
+          installed: false,
+          code: 'AMBIGUOUS_NAME',
+          name,
+          owners: e.owners,
+          candidates,
+          owners_truncated: mayBeTruncated,
+        })
+        process.exit(1)
+      }
+
+      // Prompting needs a terminal. Piped into something, say what to type rather than hanging on
+      // a question nobody is there to answer.
+      if (!process.stdin.isTTY) {
+        throw new Error(
+          `Skill name "${name}" is claimed by multiple owners. Install one by its qualified name:\n` +
+            candidates.map((c) => `  skillpm install ${c}`).join('\n') +
+            (mayBeTruncated ? '\n  ...and possibly others — see `skillpm search`.' : '')
+        )
+      }
+
+      if (spinner) spinner.stop()
+      const { select } = await import('@inquirer/prompts')
+      const chosen = await select({
+        message: `"${name}" is claimed by ${
+          mayBeTruncated ? 'several' : e.owners.length
+        } owners. Which one?`,
+        choices: candidates.map((c) => ({ name: c, value: c })),
+      })
+
+      if (spinner) spinner.start(`Looking up "${chosen}" in registry...`)
+      info = await getSkillInstallInfo(chosen)
+    }
 
     if (spinner) spinner.text = `Installing "${name}" from ${info.source_url}...`
 

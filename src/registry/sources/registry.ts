@@ -129,17 +129,53 @@ async function registryFetch<T>(path: string, options?: RequestInit): Promise<T>
 
   if (!res.ok) {
     let message = `Registry error ${res.status}`
+    let code: string | undefined
+    let owners: string[] | undefined
     try {
-      const body = (await res.json()) as { error?: string }
+      const body = (await res.json()) as { error?: string; code?: string; owners?: string[] }
       if (body.error) message = body.error
+      code = body.code
+      owners = body.owners
     } catch {
       // Body was not JSON — keep the status-code message.
     }
-    throw new Error(message)
+    // The structured fields used to be dropped here, message kept and everything else discarded.
+    // That threw away the answer: a 409 on an ambiguous name arrives with the full list of owners
+    // claiming it, and the CLI could only reprint prose telling the user to go and find them.
+    throw Object.assign(new Error(message), { status: res.status, code, owners })
   }
 
   return res.json() as Promise<T>
 }
+
+/** A failed registry call, carrying whatever structured detail the API sent with it. */
+export interface RegistryError extends Error {
+  status?: number
+  code?: string
+  /** Owners claiming a bare name, sent with `code: 'AMBIGUOUS_NAME'`. At most ten. */
+  owners?: string[]
+}
+
+/**
+ * Did this call fail because a bare name is claimed by more than one owner?
+ *
+ * Checks the owners list is actually usable rather than trusting the code alone, because the
+ * caller's next move is to offer those owners as choices and an empty list would offer none.
+ */
+export function isAmbiguousNameError(e: unknown): e is RegistryError & { owners: string[] } {
+  if (!(e instanceof Error)) return false
+  const err = e as RegistryError
+  return err.code === 'AMBIGUOUS_NAME' && Array.isArray(err.owners) && err.owners.length > 0
+}
+
+/**
+ * The registry answers an ambiguous name with at most ten owners.
+ *
+ * `getSkillByBareName` selects `LIMIT 11` and returns `rows.slice(0, 10)`, so eleven claimants
+ * and a hundred produce the same ten-entry list with nothing to tell them apart. A list of
+ * exactly this length may therefore be partial, and must not be presented as the complete set.
+ */
+export const MAX_REPORTED_OWNERS = 10
 
 /**
  * Path-encode a skill name that may be owner-qualified.
