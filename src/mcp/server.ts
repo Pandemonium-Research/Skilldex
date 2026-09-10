@@ -34,16 +34,51 @@ export async function startMcpServer(): Promise<void> {
   // skilldex_install
   server.tool(
     'skilldex_install',
-    'Install a skill from a local path or git+https:// URL',
+    'Install a skill from a local path, git+https:// URL, or registry name',
     {
-      source: z.string().describe('Local path or git+https:// URL'),
+      source: z
+        .string()
+        .describe('Local path, git+https:// URL, or registry skill name (owner/name)'),
       scope: z.enum(['global', 'shared', 'project']).default('project'),
       force: z.boolean().default(false),
     },
     async ({ source, scope, force }) => {
       let result
-      if (source.startsWith('git+')) {
+      if (isGitSource(source)) {
         result = await installFromGitUrl(source, { scope, force, sourceUrl: source })
+      } else if (isRegistryName(source)) {
+        // This branch did not exist. The tool accepted a local path or a git URL and sent
+        // everything else to installFromPath, so a registry name was looked for on disk and
+        // failed as a missing directory — while skilldex_skillset_install, immediately below,
+        // resolved skillset names from the registry perfectly well.
+        const { resolveRegistrySkill } = await import('../core/registry-install.js')
+        const resolution = await resolveRegistrySkill(source)
+
+        // An agent cannot be asked which owner was meant, only told. Handing back the qualified
+        // candidates lets it retry with one; the bare name will never resolve on its own.
+        if (resolution.kind === 'ambiguous') {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  installed: false,
+                  code: 'AMBIGUOUS_NAME',
+                  name: resolution.name,
+                  owners: resolution.owners,
+                  candidates: resolution.candidates,
+                  owners_truncated: resolution.ownersTruncated,
+                }),
+              },
+            ],
+          }
+        }
+
+        result = await installFromGitUrl(`git+${resolution.info.source_url}`, {
+          scope,
+          force,
+          sourceUrl: resolution.info.source_url,
+        })
       } else {
         result = await installFromPath(source, { scope, force })
       }
@@ -109,10 +144,29 @@ export async function startMcpServer(): Promise<void> {
     },
     async ({ projectPath }) => {
       const { gatherProjectContext, generateProposals } = await import('../core/suggest-agent.js')
+      const { describeEmptyProfile } = await import('../core/project-context.js')
       const { findProjectRoot } = await import('../core/resolver.js')
       const root = await findProjectRoot(projectPath ?? process.cwd())
       const context = await gatherProjectContext(root)
-      const proposals = await generateProposals(context)
+
+      // An agent reading this needs to be told the project was unreadable, not handed invented
+      // names it will then try to install.
+      if (context.profile.isEmpty) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                proposals: [],
+                reason: 'no-project-context',
+                detail: describeEmptyProfile(context.profile),
+              }),
+            },
+          ],
+        }
+      }
+
+      const proposals = await generateProposals(context.text)
       return {
         content: [{ type: 'text', text: JSON.stringify({ proposals }) }],
       }

@@ -80,8 +80,57 @@ async function runRegistryInstall(
 ): Promise<void> {
   const spinner = options.json ? null : ora(`Looking up "${name}" in registry...`).start()
   try {
-    const { getSkillInstallInfo } = await import('../../registry/sources/registry.js')
-    const info = await getSkillInstallInfo(name)
+    const { resolveRegistrySkill } = await import('../../core/registry-install.js')
+    let resolution = await resolveRegistrySkill(name)
+
+    if (resolution.kind === 'ambiguous') {
+      // A bare name claimed by several owners. The registry says so and names them — but what it
+      // suggests in prose is an HTTP path, `use /skills/{owner}/<name>/install`, which is not
+      // something anyone can type into this CLI. The owners are right there, so offer them.
+      const { candidates, owners, ownersTruncated } = resolution
+
+      if (options.json) {
+        if (spinner) spinner.stop()
+        printJson({
+          installed: false,
+          code: 'AMBIGUOUS_NAME',
+          name,
+          owners,
+          candidates,
+          owners_truncated: ownersTruncated,
+        })
+        process.exit(1)
+      }
+
+      // Prompting needs a terminal. Piped into something, say what to type rather than hanging on
+      // a question nobody is there to answer.
+      if (!process.stdin.isTTY) {
+        throw new Error(
+          `Skill name "${name}" is claimed by multiple owners. Install one by its qualified name:\n` +
+            candidates.map((c) => `  skillpm install ${c}`).join('\n') +
+            (ownersTruncated ? '\n  ...and possibly others — see `skillpm search`.' : '')
+        )
+      }
+
+      if (spinner) spinner.stop()
+      const { select } = await import('@inquirer/prompts')
+      const chosen = await select({
+        message: `"${name}" is claimed by ${
+          ownersTruncated ? 'several' : owners.length
+        } owners. Which one?`,
+        choices: candidates.map((c) => ({ name: c, value: c })),
+      })
+
+      if (spinner) spinner.start(`Looking up "${chosen}" in registry...`)
+      resolution = await resolveRegistrySkill(chosen)
+      if (resolution.kind === 'ambiguous') {
+        // A qualified name cannot be ambiguous — (owner, name) is unique in the registry — but
+        // the type does not know that and silently installing the wrong skill would be worse.
+        throw new Error(`"${chosen}" is still ambiguous; install it by its source URL instead.`)
+      }
+    }
+
+    const info = resolution.info
 
     if (spinner) spinner.text = `Installing "${name}" from ${info.source_url}...`
 
