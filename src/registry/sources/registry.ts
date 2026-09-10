@@ -41,6 +41,21 @@ export async function getAuthUrl(): Promise<string> {
 
 export interface RegistrySkill {
   name: string
+  /**
+   * Who published it, and the `owner/name` that identifies it unambiguously.
+   *
+   * The registry has sent all three of these since names stopped being unique, and the CLI
+   * declared none of them — so nothing here could tell two skills apart when they share a name,
+   * and `terraform` alone is claimed by ten owners. `skillpm search` printed ten rows called
+   * `terraform` with no way to say which one `skillpm install terraform` would fetch. It would
+   * fetch none of them: the unqualified endpoint answers 409 and asks the caller to qualify.
+   *
+   * Optional because a registry predating qualified names does not send them, and the CLI is
+   * routinely a version ahead of the deployment it is talking to.
+   */
+  owner?: string
+  qualified_name?: string
+  display_name?: string
   description: string
   author: string | null
   source_url: string
@@ -85,6 +100,8 @@ export interface SearchResponse {
 
 export interface InstallInfo {
   name: string
+  owner?: string
+  qualified_name?: string
   source_url: string
   score: number | null
   spec_version: string
@@ -124,6 +141,32 @@ async function registryFetch<T>(path: string, options?: RequestInit): Promise<T>
   return res.json() as Promise<T>
 }
 
+/**
+ * Path-encode a skill name that may be owner-qualified.
+ *
+ * `encodeURIComponent` escapes the slash in `mauromedda/terraform` to `%2F`, and the registry
+ * routes on real path segments — so the request reaches no route at all and comes back
+ * `404 Skill not found` for a skill that exists and answers 200 when the slash is left alone.
+ *
+ * That made qualified names unreachable from the CLI at exactly the moment they became necessary.
+ * Names are not unique: `terraform` is claimed by ten owners, and the unqualified endpoint
+ * answers `409 AMBIGUOUS_NAME` telling the caller to use `{owner}/{name}` — the one form that
+ * then failed. Both paths out of an ambiguous name were closed.
+ *
+ * Each segment is still escaped, so a name containing a character that needs encoding is handled;
+ * only the separator survives.
+ *
+ * Skillsets deliberately do not use this. They are not owner-qualified — the registry sends no
+ * `owner` or `qualified_name` for them — so a slash in a skillset name is not a separator, and
+ * treating it as one would build a URL the registry does not serve.
+ */
+function encodeSkillPath(name: string): string {
+  return name
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')
+}
+
 export async function searchRegistry(options: SearchOptions = {}): Promise<SearchResponse> {
   const params = new URLSearchParams()
   if (options.q) params.set('q', options.q)
@@ -140,11 +183,11 @@ export async function searchRegistry(options: SearchOptions = {}): Promise<Searc
 }
 
 export async function getSkillInstallInfo(name: string): Promise<InstallInfo> {
-  return registryFetch<InstallInfo>(`/skills/${encodeURIComponent(name)}/install`)
+  return registryFetch<InstallInfo>(`/skills/${encodeSkillPath(name)}/install`)
 }
 
 export async function getSkill(name: string): Promise<RegistrySkill> {
-  return registryFetch<RegistrySkill>(`/skills/${encodeURIComponent(name)}`)
+  return registryFetch<RegistrySkill>(`/skills/${encodeSkillPath(name)}`)
 }
 
 export async function publishSkill(token: string, body: PublishBody): Promise<PublishResponse> {
@@ -156,14 +199,14 @@ export async function publishSkill(token: string, body: PublishBody): Promise<Pu
 }
 
 export async function updateSkill(token: string, name: string): Promise<PublishResponse> {
-  return registryFetch<PublishResponse>(`/skills/${encodeURIComponent(name)}`, {
+  return registryFetch<PublishResponse>(`/skills/${encodeSkillPath(name)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
   })
 }
 
 export async function deleteSkill(token: string, name: string): Promise<void> {
-  await registryFetch<void>(`/skills/${encodeURIComponent(name)}`, {
+  await registryFetch<void>(`/skills/${encodeSkillPath(name)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })

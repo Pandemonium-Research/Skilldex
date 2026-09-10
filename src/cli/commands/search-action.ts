@@ -17,8 +17,22 @@ function scoreLabel(score: number | null): string {
   return chalk.red(`${score}/100`)
 }
 
+/**
+ * Identify a result by `owner/name` wherever the registry gives us one.
+ *
+ * Names are not unique. A search for `terraform` returns ten rows all titled `terraform`, and the
+ * command printed underneath each of them was `skillpm install terraform` — the same line ten
+ * times, for ten different skills, and a line that installs none of them: the unqualified
+ * endpoint answers 409 and asks which owner was meant.
+ *
+ * Falls back to the bare name so a registry that does not send qualified names still renders.
+ */
+function skillId(skill: RegistrySkill): string {
+  return skill.qualified_name ?? (skill.owner ? `${skill.owner}/${skill.name}` : skill.name)
+}
+
 function renderSkillCard(skill: RegistrySkill, _index: number): void {
-  console.log(`\n${chalk.bold(skill.name)} ${tierBadge(skill.trust_tier)}`)
+  console.log(`\n${chalk.bold(skillId(skill))} ${tierBadge(skill.trust_tier)}`)
   console.log(`  ${skill.description}`)
   console.log(
     `  Score: ${scoreLabel(skill.score)}  ·  Installs: ${skill.install_count}  ·  Spec: v${skill.spec_version}`
@@ -26,7 +40,7 @@ function renderSkillCard(skill: RegistrySkill, _index: number): void {
   if (skill.tags.length > 0) {
     console.log(`  Tags: ${skill.tags.map(t => chalk.cyan(t)).join(', ')}`)
   }
-  console.log(`  ${chalk.dim(`skillpm install ${skill.name}`)}`)
+  console.log(`  ${chalk.dim(`skillpm install ${skillId(skill)}`)}`)
 }
 
 export async function runSearch(
