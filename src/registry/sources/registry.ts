@@ -89,6 +89,15 @@ export interface SearchOptions {
   sort?: SearchSort
   limit?: number
   offset?: number
+  /**
+   * Abort the request.
+   *
+   * Search is the slow path — single-keyword queries measured between 2.6s and 25.4s against
+   * production, and the platform cuts them off at 30s. A caller running several at once needs to
+   * give up on the stragglers, and racing a timer without this would leave the request running
+   * and holding the process open after nobody is waiting for it.
+   */
+  signal?: AbortSignal
 }
 
 export interface SearchResponse {
@@ -215,7 +224,10 @@ export async function searchRegistry(options: SearchOptions = {}): Promise<Searc
   if (options.offset !== undefined) params.set('offset', String(options.offset))
 
   const qs = params.toString()
-  return registryFetch<SearchResponse>(`/skills${qs ? `?${qs}` : ''}`)
+  return registryFetch<SearchResponse>(
+    `/skills${qs ? `?${qs}` : ''}`,
+    options.signal ? { signal: options.signal } : undefined
+  )
 }
 
 export async function getSkillInstallInfo(name: string): Promise<InstallInfo> {
