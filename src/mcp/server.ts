@@ -143,7 +143,7 @@ export async function startMcpServer(): Promise<void> {
       projectPath: z.string().optional().describe('Path to project (defaults to cwd)'),
     },
     async ({ projectPath }) => {
-      const { gatherProjectContext, generateProposals } = await import('../core/suggest-agent.js')
+      const { gatherProjectContext, suggestForProject } = await import('../core/suggest-agent.js')
       const { describeEmptyProfile } = await import('../core/project-context.js')
       const { findProjectRoot } = await import('../core/resolver.js')
       const root = await findProjectRoot(projectPath ?? process.cwd())
@@ -166,9 +166,28 @@ export async function startMcpServer(): Promise<void> {
         }
       }
 
-      const proposals = await generateProposals(context.text)
+      const { proposals, pool, queries } = await suggestForProject(context.profile)
+
       return {
-        content: [{ type: 'text', text: JSON.stringify({ proposals }) }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              // Every qualifiedName here is installable as-is via skilldex_install.
+              proposals,
+              queries,
+              // Searches that failed are reported, not swallowed. An agent seeing two proposals
+              // should be able to tell "little fits this project" from "half the searches timed
+              // out", and act differently.
+              search: {
+                candidates: pool.candidates.length,
+                alreadyInstalled: pool.alreadyInstalled,
+                elapsedMs: pool.elapsedMs,
+                queries: pool.queries,
+              },
+            }),
+          },
+        ],
       }
     }
   )
