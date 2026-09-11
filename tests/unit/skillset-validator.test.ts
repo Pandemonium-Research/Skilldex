@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateSkillset } from '../../src/core/skillset-validator.js'
@@ -34,11 +36,33 @@ describe('validateSkillset', () => {
     expect(result.errorCount).toBeGreaterThan(0)
   })
 
-  it('emits error for description shorter than 30 words', async () => {
+  it('warns, rather than errors, on a description shorter than 30 words', async () => {
     const result = await validateSkillset(fixtures('short-desc-skillset'))
     const diag = result.diagnostics.find((d) => d.check === 'description-length')
-    expect(diag?.severity).toBe('error')
+    expect(diag?.severity).toBe('warning')
     expect(diag?.message).toMatch(/too short/)
+  })
+
+  it('still errors on a missing description, although it shares the length check id', async () => {
+    // The presence branch is tagged `description-length` as well. It must stay an error: an absent
+    // description violates the specification, and `skillset install` refuses on errors — demote it
+    // along with the length check and a skillset with no description at all becomes installable.
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'skilldex-no-desc-'))
+    try {
+      await writeFile(
+        path.join(dir, 'SKILLSET.md'),
+        '---\nname: no-desc\nversion: "1.0.0"\nspec_version: "1.1"\n---\n\n# no-desc\n',
+        'utf8'
+      )
+      const result = await validateSkillset(dir)
+      const diag = result.diagnostics.find(
+        (d) => d.check === 'description-length' && /missing or empty/.test(d.message)
+      )
+      expect(diag?.severity).toBe('error')
+      expect(result.errorCount).toBeGreaterThan(0)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('emits error when skillset has no embedded or remote skills', async () => {

@@ -6,7 +6,7 @@
 // second yes.
 //
 // The interesting behaviour is the repair loop. A model writes a crisp one-line description
-// because that reads better, and the validator requires thirty words — so the first attempt fails
+// because that reads better, and the validator recommends thirty words — so the first attempt fails
 // on exactly the check a generator is most likely to miss, and the retry has to actually carry the
 // diagnostics back.
 
@@ -94,8 +94,10 @@ describe('createSkillDraft', () => {
     expect(complete).toHaveBeenCalledTimes(1)
   })
 
-  it('regenerates once from the validator errors when the first attempt fails', async () => {
-    // The failure mode this exists for: a one-line description reads better and scores zero.
+  it('regenerates once from the validator diagnostics when the first attempt falls short', async () => {
+    // The failure mode this exists for: a one-line description reads better and costs its points.
+    // `Too short.` now draws only a warning, not an error — so this is also what holds the loop to
+    // warnings. Keyed on errors alone, one-line descriptions would stop being repaired.
     const complete = vi
       .fn<Parameters<Complete>, ReturnType<Complete>>()
       .mockResolvedValueOnce(skillMd('Too short.'))
@@ -131,7 +133,13 @@ describe('createSkillDraft', () => {
 
     expect(complete).toHaveBeenCalledTimes(2)
     expect(draft.repaired).toBe(true)
-    expect(draft.validation.errorCount).toBeGreaterThan(0)
+    // Still short after the retry — a warning now, not an error, but the diagnostic survives so the
+    // user can see why the draft was regenerated.
+    expect(
+      draft.validation.diagnostics.some(
+        (d) => d.check === 'description-length' && d.severity === 'warning'
+      )
+    ).toBe(true)
     // Still on disk, so the user can fix it by hand.
     await expect(readFile(path.join(draft.dir, 'SKILL.md'), 'utf8')).resolves.toContain('name:')
   })

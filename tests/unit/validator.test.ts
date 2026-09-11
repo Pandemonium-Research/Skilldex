@@ -29,12 +29,15 @@ describe('validateSkill', () => {
     expect(result.errorCount).toBeGreaterThan(0)
   })
 
-  it('emits error for short description with line number', async () => {
+  it('warns, rather than errors, on a short description, with a line number', async () => {
+    // The specification sets no word minimum; thirty words is Skilldex's recommendation. As an
+    // error it failed `skillpm validate`, and so CI, on a skill the specification accepts.
     const result = await validateSkill(fixtures('short-description-skill'))
     const diag = result.diagnostics.find((d) => d.check === 'description-length')
-    expect(diag?.severity).toBe('error')
+    expect(diag?.severity).toBe('warning')
     expect(diag?.message).toMatch(/too short/)
     expect(diag?.line).toBeGreaterThan(0)
+    expect(result.errorCount).toBe(0)
   })
 
   it('emits warning for unknown subdirectory', async () => {
