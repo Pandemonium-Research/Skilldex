@@ -1,7 +1,12 @@
 import { readFile, stat, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { parseDocument } from 'yaml'
-import type { ValidationResult, ValidationDiagnostic, SkillFrontmatter } from '../types/skill.js'
+import type {
+  ValidationResult,
+  ValidationDiagnostic,
+  SkillFrontmatter,
+  CheckScore,
+} from '../types/skill.js'
 
 export const SPEC_VERSION = '1.0'
 const SKILL_MD = 'SKILL.md'
@@ -58,9 +63,68 @@ const WEIGHTS = {
   bundledResourcesCorrect: 2,
 } as const
 
+/**
+ * The scored checks, in the order they run and are reported, each tied to its weight.
+ *
+ * One table is the point. The score, the per-check breakdown and the display all read from it,
+ * so the breakdown cannot drift from the number it explains. That is the failure mode of the
+ * point values that used to sit in a comment beside each check: three of them had drifted from
+ * the weights they described, one reading "25 pts" for a 16-point check.
+ */
+const CHECKS = [
+  { id: 'yaml-frontmatter', weight: WEIGHTS.frontmatterParseable },
+  { id: 'name-present', weight: WEIGHTS.namePresent },
+  { id: 'name-format', weight: WEIGHTS.nameFormat },
+  { id: 'description-present', weight: WEIGHTS.descriptionPresent },
+  { id: 'description-length', weight: WEIGHTS.descriptionLength },
+  { id: 'description-format', weight: WEIGHTS.descriptionFormat },
+  { id: 'line-count', weight: WEIGHTS.lineCount },
+  { id: 'allowed-subdirs', weight: WEIGHTS.allowedSubdirs },
+  { id: 'no-readme', weight: WEIGHTS.noReadme },
+  { id: 'referenced-resources', weight: WEIGHTS.referencedResourcesExist },
+  { id: 'bundled-resources', weight: WEIGHTS.bundledResourcesCorrect },
+] as const
+
+type CheckId = (typeof CHECKS)[number]['id']
+
+const SEVERITY_RANK = { pass: 0, warning: 1, error: 2 } as const
+
+function worstSeverity(diagnostics: ValidationDiagnostic[]): ValidationDiagnostic['severity'] | null {
+  let worst: ValidationDiagnostic['severity'] | null = null
+  for (const d of diagnostics) {
+    if (worst === null || SEVERITY_RANK[d.severity] > SEVERITY_RANK[worst]) worst = d.severity
+  }
+  return worst
+}
+
+/**
+ * Attribute every point of the score to exactly one check.
+ *
+ * Status is the worst severity a check emitted. Silence alone does not mean a check was skipped:
+ * `description-present` emits nothing when it passes, so a check that awarded points ran. Only a
+ * check that neither awarded points nor emitted a diagnostic is `skipped` — something it depends
+ * on failed first — and it is reported that way rather than as a failure, so a missing
+ * description shows its length as not evaluated, not as too short.
+ */
+function buildBreakdown(
+  earned: ReadonlyMap<CheckId, number>,
+  diagnostics: ValidationDiagnostic[]
+): CheckScore[] {
+  return CHECKS.map(({ id, weight }) => ({
+    check: id,
+    earned: earned.get(id) ?? 0,
+    possible: weight,
+    status:
+      worstSeverity(diagnostics.filter((d) => d.check === id)) ?? (earned.has(id) ? 'pass' : 'skipped'),
+  }))
+}
+
 export async function validateSkill(skillPath: string): Promise<ValidationResult> {
   const diagnostics: ValidationDiagnostic[] = []
-  let score = 0
+  const earned = new Map<CheckId, number>()
+  const award = (check: CheckId, points: number): void => {
+    earned.set(check, (earned.get(check) ?? 0) + points)
+  }
 
   const absPath = path.resolve(skillPath)
 
@@ -91,36 +155,38 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
   const lines = content.split(/\r?\n/)
   const lineCount = lines.length
 
-  // --- Check: YAML frontmatter parseable (25 pts) ---
+  // --- Check: YAML frontmatter parseable ---
   const { frontmatter, frontmatterEndLine, parseError } = extractFrontmatter(content, lines)
 
   if (parseError || frontmatter === null) {
     // Frontmatter is fatal — no other checks make sense without it
+    const fatalDiagnostics: ValidationDiagnostic[] = [
+      {
+        severity: 'error',
+        line: 1,
+        message: parseError ?? 'Missing YAML frontmatter — file must start with ---',
+        check: 'yaml-frontmatter',
+      },
+    ]
     return {
       skill: path.basename(absPath),
       score: 0,
-      diagnostics: [
-        {
-          severity: 'error',
-          line: 1,
-          message: parseError ?? 'Missing YAML frontmatter — file must start with ---',
-          check: 'yaml-frontmatter',
-        },
-      ],
+      diagnostics: fatalDiagnostics,
       specVersion: SPEC_VERSION,
       passCount: 0,
       warnCount: 0,
       errorCount: 1,
+      breakdown: buildBreakdown(new Map(), fatalDiagnostics),
     }
   } else {
-    score += WEIGHTS.frontmatterParseable
+    award('yaml-frontmatter', WEIGHTS.frontmatterParseable)
     diagnostics.push({
       severity: 'pass',
       message: 'YAML frontmatter valid',
       check: 'yaml-frontmatter',
     })
 
-    // --- Check: name present (16 pts) ---
+    // --- Check: name present ---
     const nameValue = frontmatter.name == null ? '' : String(frontmatter.name).trim()
     const nameLine = findFieldLine(lines, 'name', frontmatterEndLine)
     if (nameValue === '') {
@@ -131,21 +197,21 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
         check: 'name-present',
       })
     } else {
-      score += WEIGHTS.namePresent
+      award('name-present', WEIGHTS.namePresent)
       diagnostics.push({
         severity: 'pass',
         message: 'name field present',
         check: 'name-present',
       })
 
-      // --- Check: name format — kebab-case + not reserved (11 pts) ---
+      // --- Check: name format — kebab-case + not reserved ---
       const nameErrors = skillNameErrors(nameValue)
       if (nameErrors.length > 0) {
         for (const message of nameErrors) {
           diagnostics.push({ severity: 'error', line: nameLine, message, check: 'name-format' })
         }
       } else {
-        score += WEIGHTS.nameFormat
+        award('name-format', WEIGHTS.nameFormat)
         diagnostics.push({
           severity: 'pass',
           message: 'name is kebab-case and uses no reserved words',
@@ -165,17 +231,22 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
         check: 'description-present',
       })
     } else {
-      score += WEIGHTS.descriptionPresent
+      award('description-present', WEIGHTS.descriptionPresent)
       const wordCount = descValue.split(/\s+/).length
       if (wordCount < MIN_DESCRIPTION_WORDS) {
+        // A warning, not an error. The specification requires 1-1024 characters and sets no word
+        // minimum (agentskills.io); thirty words is Skilldex's recommendation. As an error it failed
+        // every CI run of `skillpm validate` on a skill the specification considers valid, which is
+        // roughly half of all public skills. Severity does not move the score: points are awarded
+        // on pass, so the check still costs its weight either way.
         diagnostics.push({
-          severity: 'error',
+          severity: 'warning',
           line: descLine,
           message: `description too short (current: ${wordCount} words, recommended: ${MIN_DESCRIPTION_WORDS}+)`,
           check: 'description-length',
         })
       } else {
-        score += WEIGHTS.descriptionLength
+        award('description-length', WEIGHTS.descriptionLength)
         diagnostics.push({
           severity: 'pass',
           message: `description meets length requirement (${wordCount} words)`,
@@ -183,7 +254,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
         })
       }
 
-      // --- Check: description format — char limit + no XML tags (11 pts) ---
+      // --- Check: description format — char limit + no XML tags ---
       const descErrors: string[] = []
       if (descValue.length > MAX_DESCRIPTION_CHARS) {
         descErrors.push(
@@ -198,7 +269,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
           diagnostics.push({ severity: 'error', line: descLine, message, check: 'description-format' })
         }
       } else {
-        score += WEIGHTS.descriptionFormat
+        award('description-format', WEIGHTS.descriptionFormat)
         diagnostics.push({
           severity: 'pass',
           message: 'description is within the character limit and free of XML tags',
@@ -208,22 +279,24 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     }
   }
 
-  // --- Check: SKILL.md line count (15 pts) ---
+  // --- Check: SKILL.md line count ---
+  // Over 500 lines is a warning for the same reason: the specification recommends keeping SKILL.md
+  // under 500 lines and does not require it. It still earns no points.
   if (lineCount > MAX_LINES) {
     diagnostics.push({
-      severity: 'error',
-      message: `SKILL.md is ${lineCount} lines — exceeds ${MAX_LINES} line limit`,
+      severity: 'warning',
+      message: `SKILL.md is ${lineCount} lines — over the recommended ${MAX_LINES}`,
       check: 'line-count',
     })
   } else if (lineCount > WARN_LINES) {
-    score += WEIGHTS.lineCount
+    award('line-count', WEIGHTS.lineCount)
     diagnostics.push({
       severity: 'warning',
-      message: `SKILL.md is ${lineCount} lines — approaching ${MAX_LINES} line limit`,
+      message: `SKILL.md is ${lineCount} lines — approaching the recommended ${MAX_LINES}`,
       check: 'line-count',
     })
   } else {
-    score += WEIGHTS.lineCount
+    award('line-count', WEIGHTS.lineCount)
     diagnostics.push({
       severity: 'pass',
       message: `SKILL.md line count OK (${lineCount} lines)`,
@@ -231,7 +304,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     })
   }
 
-  // --- Check: allowed subdirectories (4 pts) ---
+  // --- Check: allowed subdirectories ---
   const subDirResult = await checkSubdirectories(absPath)
   if (subDirResult.unknownDirs.length > 0) {
     for (const dir of subDirResult.unknownDirs) {
@@ -243,9 +316,9 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     }
     // Partial credit: deduct per unknown dir but don't go below 0
     const deduction = Math.min(WEIGHTS.allowedSubdirs, subDirResult.unknownDirs.length * 2)
-    score += Math.max(0, WEIGHTS.allowedSubdirs - deduction)
+    award('allowed-subdirs', Math.max(0, WEIGHTS.allowedSubdirs - deduction))
   } else {
-    score += WEIGHTS.allowedSubdirs
+    award('allowed-subdirs', WEIGHTS.allowedSubdirs)
     diagnostics.push({
       severity: 'pass',
       message: 'Folder structure matches convention',
@@ -253,7 +326,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     })
   }
 
-  // --- Check: no README.md inside the skill folder (4 pts) ---
+  // --- Check: no README.md inside the skill folder ---
   if (subDirResult.hasReadme) {
     diagnostics.push({
       severity: 'warning',
@@ -261,7 +334,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
       check: 'no-readme',
     })
   } else {
-    score += WEIGHTS.noReadme
+    award('no-readme', WEIGHTS.noReadme)
     diagnostics.push({
       severity: 'pass',
       message: 'No README.md inside the skill folder',
@@ -269,7 +342,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     })
   }
 
-  // --- Check: referenced resources exist (7 pts) ---
+  // --- Check: referenced resources exist ---
   const brokenRefs = await checkBrokenReferences(content, absPath, lines)
   if (brokenRefs.length > 0) {
     for (const ref of brokenRefs) {
@@ -281,7 +354,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
       })
     }
   } else {
-    score += WEIGHTS.referencedResourcesExist
+    award('referenced-resources', WEIGHTS.referencedResourcesExist)
     diagnostics.push({
       severity: 'pass',
       message: 'All referenced resources exist',
@@ -289,7 +362,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     })
   }
 
-  // --- Check: bundled resources in correct subdirs (5 pts) ---
+  // --- Check: bundled resources in correct subdirs ---
   const misplacedFiles = await checkBundledResourceStructure(absPath)
   if (misplacedFiles.length > 0) {
     for (const f of misplacedFiles) {
@@ -300,7 +373,7 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
       })
     }
   } else {
-    score += WEIGHTS.bundledResourcesCorrect
+    award('bundled-resources', WEIGHTS.bundledResourcesCorrect)
     diagnostics.push({
       severity: 'pass',
       message: 'Bundled resources in correct subdirectories',
@@ -308,7 +381,11 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     })
   }
 
-  score = Math.min(100, Math.max(0, Math.round(score)))
+  // The score is the sum of what each check earned, read from the same map as the breakdown, so the
+  // two cannot disagree. Weights sum to 100 and partial credit never goes negative, so the clamp
+  // cannot fire; it stays as a guard, and a test holds the breakdown's sum to the score.
+  const total = [...earned.values()].reduce((a, b) => a + b, 0)
+  const score = Math.min(100, Math.max(0, Math.round(total)))
 
   return {
     skill: path.basename(absPath),
@@ -318,20 +395,24 @@ export async function validateSkill(skillPath: string): Promise<ValidationResult
     passCount: diagnostics.filter((d) => d.severity === 'pass').length,
     warnCount: diagnostics.filter((d) => d.severity === 'warning').length,
     errorCount: diagnostics.filter((d) => d.severity === 'error').length,
+    breakdown: buildBreakdown(earned, diagnostics),
   }
 }
 
 // --- Helpers ---
 
 function fatal(skillPath: string, message: string): ValidationResult {
+  const diagnostics: ValidationDiagnostic[] = [{ severity: 'error', message, check: 'skill-exists' }]
   return {
     skill: path.basename(skillPath),
     score: 0,
-    diagnostics: [{ severity: 'error', message, check: 'skill-exists' }],
+    diagnostics,
     specVersion: SPEC_VERSION,
     passCount: 0,
     warnCount: 0,
     errorCount: 1,
+    // `skill-exists` is not a weighted check, so every row reads as not evaluated, not failed.
+    breakdown: buildBreakdown(new Map(), diagnostics),
   }
 }
 

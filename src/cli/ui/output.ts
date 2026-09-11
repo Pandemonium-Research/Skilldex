@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import type { ValidationResult, ValidationDiagnostic } from '../../types/skill.js'
+import type { ValidationResult, ValidationDiagnostic, CheckScore } from '../../types/skill.js'
 
 const LABEL_WIDTH = 7
 
@@ -14,6 +14,30 @@ function label(severity: ValidationDiagnostic['severity']): string {
   }
 }
 
+/**
+ * Each check's points, so the aggregate can be read rather than trusted.
+ *
+ * Full marks are dimmed and shortfalls coloured by severity, which puts the eye on whatever cost
+ * points: a 94 can hide the one failure that decides whether an agent ever invokes the skill. A
+ * check that never ran is shown as not evaluated rather than as a zero, which would read as failed.
+ */
+function renderBreakdown(breakdown: CheckScore[]): string[] {
+  if (breakdown.length === 0) return []
+  const width = Math.max(...breakdown.map((r) => r.check.length))
+  const rows = breakdown.map((r) => {
+    const name = r.check.padEnd(width)
+    const possible = String(r.possible)
+    if (r.status === 'skipped') {
+      return `  ${chalk.dim(`${name}   —/${possible.padEnd(2)}  not evaluated`)}`
+    }
+    const points = `${String(r.earned).padStart(2)}/${possible}`
+    if (r.earned === r.possible) return `  ${chalk.dim(`${name}  ${points}`)}`
+    const colour = r.status === 'error' ? chalk.red : chalk.yellow
+    return `  ${name}  ${colour(points)}`
+  })
+  return ['Score breakdown:', ...rows]
+}
+
 export function renderValidationReport(result: ValidationResult): string {
   const lines: string[] = []
 
@@ -23,6 +47,9 @@ export function renderValidationReport(result: ValidationResult): string {
   }
 
   lines.push('')
+
+  const breakdown = renderBreakdown(result.breakdown)
+  if (breakdown.length > 0) lines.push(...breakdown, '')
 
   const scoreColor =
     result.score >= 80 ? chalk.green : result.score >= 50 ? chalk.yellow : chalk.red

@@ -105,9 +105,13 @@ export async function validateSkillset(skillsetPath: string): Promise<SkillsetVa
   } else {
     score += WEIGHTS.descriptionPresent
     const wordCount = String(frontmatter.description).trim().split(/\s+/).length
+    // A warning, as in the skill validator: the specification sets no word minimum. The missing-
+    // description branch above stays an error despite sharing this check id — an absent
+    // description is a specification violation, and demoting it would make a skillset with no
+    // description at all installable.
     if (wordCount < MIN_DESCRIPTION_WORDS) {
       diagnostics.push({
-        severity: 'error',
+        severity: 'warning',
         message: `description too short (current: ${wordCount} words, recommended: ${MIN_DESCRIPTION_WORDS}+)`,
         check: 'description-length',
       })

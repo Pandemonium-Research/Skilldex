@@ -69,7 +69,7 @@ async function offerDrafts(
     console.log(
       `  ${chalk.yellow(gap.name)} — ${verdict}, score ${score}/100` +
         (warnCount > 0 ? `, ${warnCount} warning(s)` : '') +
-        (draft.repaired ? chalk.dim(' (regenerated once from validator errors)') : '')
+        (draft.repaired ? chalk.dim(' (regenerated once from validator diagnostics)') : '')
     )
     console.log(`  ${chalk.dim(path.relative(projectRoot, draft.dir).replace(/\\/g, '/'))}`)
 

@@ -427,7 +427,7 @@ skill in the third person, and do not pad it to reach a length.`
 /**
  * Generate the content of a SKILL.md for a gap.
  *
- * `diagnostics` carries validator errors from a previous attempt. Feeding them back is worth one
+ * `diagnostics` carries validator errors and warnings from a previous attempt. Feeding them back is worth one
  * retry and no more: a model that has been told the description is 12 words and must be 30 will
  * usually fix it, and one that fails twice is failing for a reason another round will not reach.
  */

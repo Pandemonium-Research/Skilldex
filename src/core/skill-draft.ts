@@ -51,12 +51,18 @@ export async function createSkillDraft(
   let validation = await validateSkill(dir)
   let repaired = false
 
-  // One retry, with the errors quoted back. A model told its description is twelve words and must
+  // One retry, with the problems quoted back. A model told its description is twelve words and must
   // be thirty will generally fix it; one that fails twice is failing for a reason a third attempt
   // will not reach either, and the draft is handed over with its diagnostics instead.
-  if (validation.errorCount > 0) {
+  //
+  // Warnings trigger the retry as well as errors. The thirty-word floor is a warning now, because
+  // the specification does not require it and failing a user's CI on it was wrong — but this loop
+  // was built for exactly that check: a model writes a crisp one-line description because it reads
+  // better. A draft is Skilldex's own output, so it is held to Skilldex's recommendations, not only
+  // to the specification. Keyed on errors alone, one-line descriptions would stop being repaired.
+  if (validation.errorCount > 0 || validation.warnCount > 0) {
     const diagnostics = validation.diagnostics
-      .filter((d) => d.severity === 'error')
+      .filter((d) => d.severity !== 'pass')
       .map((d) => d.message)
 
     content = await generateSkillDraft(context, gap, { ...options, diagnostics })
