@@ -13,6 +13,16 @@
       "expectedScore": 87
     },
     {
+      "id": "anchored-ref-valid-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: anchored-ref-valid-skill\ndescription: This skill links to a bundled reference file using a fragment anchor, and the file it names is present. Both validators must strip the anchor before deciding whether the file exists, so this case scores as a working reference.\nversion: 1.0.0\n---\n\n## Instructions\n\nSee the [API guide](references/api.md#usage) before continuing.\n",
+      "files": [
+        "references/api.md",
+        "SKILL.md"
+      ],
+      "expectedScore": 100
+    },
+    {
       "id": "bad-name-skill",
       "kind": "skill",
       "skillMd": "---\nname: Bad Name\ndescription: This skill has a name that uses spaces and capital letters instead of kebab-case, so the validator should flag the name format as non-conformant while every other check in the report stays perfectly valid and passing.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis fixture exercises the kebab-case name-format check.\n",
@@ -39,6 +49,54 @@
         "SKILL.md"
       ],
       "expectedScore": 87
+    },
+    {
+      "id": "command-ref-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: command-ref-skill\ndescription: This skill shows a command line in inline code, naming a bundled script followed by a flag. The flag is not part of the file name, so both validators must reference only the script itself, which is present in this skill.\nversion: 1.0.0\n---\n\n## Instructions\n\nRun `scripts/build.sh --watch` to rebuild on every change.\n",
+      "files": [
+        "scripts/build.sh",
+        "SKILL.md"
+      ],
+      "expectedScore": 100
+    },
+    {
+      "id": "dot-dir-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: dot-dir-skill\ndescription: This skill sits at a repository root, so it has a dot directory beside it that belongs to the repository rather than to the skill. Neither validator may count that as an unknown subdirectory of the skill itself.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis skill keeps no bundled resources of its own.\n",
+      "files": [
+        ".github/workflows/ci.yml",
+        "SKILL.md"
+      ],
+      "expectedScore": 100
+    },
+    {
+      "id": "dot-relative-ref-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: dot-relative-ref-skill\ndescription: This skill links to a bundled reference file using a dot-relative path. The leading dot and slash are noise rather than part of the name, so both validators must resolve the link to the file that is present in this skill.\nversion: 1.0.0\n---\n\n## Instructions\n\nSee the [API guide](./references/api.md) before continuing.\n",
+      "files": [
+        "references/api.md",
+        "SKILL.md"
+      ],
+      "expectedScore": 100
+    },
+    {
+      "id": "escaping-ref-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: escaping-ref-skill\ndescription: This skill links to a file outside its own folder. A skill is installed as a folder on its own, so a reference that climbs out of it cannot resolve for whoever installs it, and both validators must report it as broken.\nversion: 1.0.0\n---\n\n## Instructions\n\nSee the [shared notes](../shared/notes.md) before continuing.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 93
+    },
+    {
+      "id": "frontmatter-trailing-space-skill",
+      "kind": "skill",
+      "skillMd": "--- \nname: frontmatter-trailing-space-skill\ndescription: The opening frontmatter fence of this skill carries a trailing space, which is a legal document marker in YAML. Both validators must read the frontmatter rather than treating the file as having none at all.\nversion: 1.0.0\n---\n\n## Instructions\n\nThis skill exists to pin the handling of the frontmatter fence.\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 100
     },
     {
       "id": "inline-ref-skill",
@@ -69,6 +127,16 @@
       "expectedScore": 89
     },
     {
+      "id": "nested-misplaced-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: nested-misplaced-skill\ndescription: This skill keeps an executable script inside a nested folder under references, where documents belong. It is as misplaced there as it would be at the top level, and both validators must notice it at any depth.\nversion: 1.0.0\n---\n\n## Instructions\n\nRun the installer described in the bundled references before continuing.\n",
+      "files": [
+        "references/setup/install.sh",
+        "SKILL.md"
+      ],
+      "expectedScore": 98
+    },
+    {
       "id": "no-frontmatter-skill",
       "kind": "skill",
       "skillMd": "# No Frontmatter Skill\n\nThis skill is missing the YAML frontmatter entirely. It should score 0.\n",
@@ -76,6 +144,15 @@
         "SKILL.md"
       ],
       "expectedScore": 0
+    },
+    {
+      "id": "non-path-link-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: non-path-link-skill\ndescription: This skill contains markdown links that name no file at all — a placeholder target, an external URL, and an anchor pointing within the document. None of them is a file reference, so neither validator may report a broken file for them.\nversion: 1.0.0\n---\n\n## Instructions\n\nAn illustration follows: [image](raw_image).\n\nSee the [published docs](https://example.com/docs) and jump back to [Instructions](#instructions).\n",
+      "files": [
+        "SKILL.md"
+      ],
+      "expectedScore": 100
     },
     {
       "id": "readme-in-folder-skill",
@@ -113,6 +190,26 @@
         "SKILL.md"
       ],
       "expectedScore": 93
+    },
+    {
+      "id": "titled-ref-valid-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: titled-ref-valid-skill\ndescription: This skill links to a bundled reference file using a markdown link that carries a title in quotes. The title is not part of the path, so both validators must ignore it and find the file that is present here.\nversion: 1.0.0\n---\n\n## Instructions\n\nSee the [API guide](references/api.md \"The API guide\") before continuing.\n",
+      "files": [
+        "references/api.md",
+        "SKILL.md"
+      ],
+      "expectedScore": 100
+    },
+    {
+      "id": "uppercase-ext-skill",
+      "kind": "skill",
+      "skillMd": "---\nname: uppercase-ext-skill\ndescription: This skill keeps a python script under references, where documents belong, and spells its extension in capitals. A file type is the same file type whatever its case, so both validators must treat this as a misplaced script.\nversion: 1.0.0\n---\n\n## Instructions\n\nRun the bundled helper before continuing.\n",
+      "files": [
+        "references/Setup.PY",
+        "SKILL.md"
+      ],
+      "expectedScore": 98
     },
     {
       "id": "valid-skill",
@@ -164,7 +261,7 @@
     {
       "id": "coherent-skillset",
       "kind": "skillset",
-      "skillsetMd": "---\nname: coherent-skillset\ndescription: \"A skillset whose member skills restate the shared commit convention declared in its assets folder, used to pin agreement checking across the two implementations of the coherence rules rather than only the structural ones.\"\nversion: \"1.0.0\"\ntags: [test, coherence]\nauthor: \"testuser\"\nspec_version: \"1.1\"\n---\n\n# coherent-skillset\n\nExercises shared-asset-agreement, which the structural fixtures cannot reach.\n",
+      "skillsetMd": "---\r\nname: coherent-skillset\r\ndescription: \"A skillset whose member skills restate the shared commit convention declared in its assets folder, used to pin agreement checking across the two implementations of the coherence rules rather than only the structural ones.\"\r\nversion: \"1.0.0\"\r\ntags: [test, coherence]\r\nauthor: \"testuser\"\r\nspec_version: \"1.1\"\r\n---\r\n\r\n# coherent-skillset\r\n\r\nExercises shared-asset-agreement, which the structural fixtures cannot reach.\r\n",
       "files": [
         "assets/commit-conventions.md",
         "changelog-writer/SKILL.md",
@@ -178,9 +275,9 @@
       "remoteSkillRefs": [],
       "expectedScore": 100,
       "blobs": {
-        "assets/commit-conventions.md": "# Commit conventions\n\nEvery member of this skillset maps a commit type to a changelog section the same way.\n\n```yaml skilldex-conventions\ncommit-type-to-changelog-section:\n  feat: Added\n  fix: Fixed\n  docs: omit\n```\n",
-        "changelog-writer/SKILL.md": "---\nname: changelog-writer\ndescription: \"A member skill that restates the shared commit type convention and agrees with it, so the agreement check reports a pass that both implementations of the coherence rules must agree on exactly.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when grouping entries.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Added |\n| `fix` | Fixed |\n",
-        "commit-writer/SKILL.md": "---\nname: commit-writer\ndescription: \"A member skill that restates the shared commit type convention in its own table so the agreement check has something concrete to compare against the declaration held in the skillset assets folder.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when choosing a type.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Added |\n| `fix` | Fixed |\n"
+        "assets/commit-conventions.md": "# Commit conventions\r\n\r\nEvery member of this skillset maps a commit type to a changelog section the same way.\r\n\r\n```yaml skilldex-conventions\r\ncommit-type-to-changelog-section:\r\n  feat: Added\r\n  fix: Fixed\r\n  docs: omit\r\n```\r\n",
+        "changelog-writer/SKILL.md": "---\r\nname: changelog-writer\r\ndescription: \"A member skill that restates the shared commit type convention and agrees with it, so the agreement check reports a pass that both implementations of the coherence rules must agree on exactly.\"\r\n---\r\n\r\n## Instructions\r\n\r\nFollow `../assets/commit-conventions.md` when grouping entries.\r\n\r\n| Type | Changelog section |\r\n| --- | --- |\r\n| `feat` | Added |\r\n| `fix` | Fixed |\r\n",
+        "commit-writer/SKILL.md": "---\r\nname: commit-writer\r\ndescription: \"A member skill that restates the shared commit type convention in its own table so the agreement check has something concrete to compare against the declaration held in the skillset assets folder.\"\r\n---\r\n\r\n## Instructions\r\n\r\nFollow `../assets/commit-conventions.md` when choosing a type.\r\n\r\n| Type | Changelog section |\r\n| --- | --- |\r\n| `feat` | Added |\r\n| `fix` | Fixed |\r\n"
       },
       "expectedCoherence": {
         "membersChecked": 2,
@@ -214,7 +311,7 @@
     {
       "id": "incoherent-skillset",
       "kind": "skillset",
-      "skillsetMd": "---\nname: incoherent-skillset\ndescription: \"A skillset whose member skills restate the shared commit convention declared in its assets folder, used to pin agreement checking across the two implementations of the coherence rules rather than only the structural ones.\"\nversion: \"1.0.0\"\ntags: [test, coherence]\nauthor: \"testuser\"\nspec_version: \"1.1\"\n---\n\n# incoherent-skillset\n\nExercises shared-asset-agreement, which the structural fixtures cannot reach.\n",
+      "skillsetMd": "---\r\nname: incoherent-skillset\r\ndescription: \"A skillset whose member skills restate the shared commit convention declared in its assets folder, used to pin agreement checking across the two implementations of the coherence rules rather than only the structural ones.\"\r\nversion: \"1.0.0\"\r\ntags: [test, coherence]\r\nauthor: \"testuser\"\r\nspec_version: \"1.1\"\r\n---\r\n\r\n# incoherent-skillset\r\n\r\nExercises shared-asset-agreement, which the structural fixtures cannot reach.\r\n",
       "files": [
         "assets/commit-conventions.md",
         "changelog-writer/SKILL.md",
@@ -228,9 +325,9 @@
       "remoteSkillRefs": [],
       "expectedScore": 100,
       "blobs": {
-        "assets/commit-conventions.md": "# Commit conventions\n\nEvery member of this skillset maps a commit type to a changelog section the same way.\n\n```yaml skilldex-conventions\ncommit-type-to-changelog-section:\n  feat: Added\n  fix: Fixed\n  docs: omit\n```\n",
-        "changelog-writer/SKILL.md": "---\nname: changelog-writer\ndescription: \"A member skill that restates the shared commit type convention but contradicts it, so the agreement check reports an error that both implementations of the coherence rules must agree on exactly.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when grouping entries.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Fixed |\n| `fix` | Added |\n",
-        "commit-writer/SKILL.md": "---\nname: commit-writer\ndescription: \"A member skill that restates the shared commit type convention in its own table so the agreement check has something concrete to compare against the declaration held in the skillset assets folder.\"\n---\n\n## Instructions\n\nFollow `../assets/commit-conventions.md` when choosing a type.\n\n| Type | Changelog section |\n| --- | --- |\n| `feat` | Added |\n| `fix` | Fixed |\n"
+        "assets/commit-conventions.md": "# Commit conventions\r\n\r\nEvery member of this skillset maps a commit type to a changelog section the same way.\r\n\r\n```yaml skilldex-conventions\r\ncommit-type-to-changelog-section:\r\n  feat: Added\r\n  fix: Fixed\r\n  docs: omit\r\n```\r\n",
+        "changelog-writer/SKILL.md": "---\r\nname: changelog-writer\r\ndescription: \"A member skill that restates the shared commit type convention but contradicts it, so the agreement check reports an error that both implementations of the coherence rules must agree on exactly.\"\r\n---\r\n\r\n## Instructions\r\n\r\nFollow `../assets/commit-conventions.md` when grouping entries.\r\n\r\n| Type | Changelog section |\r\n| --- | --- |\r\n| `feat` | Fixed |\r\n| `fix` | Added |\r\n",
+        "commit-writer/SKILL.md": "---\r\nname: commit-writer\r\ndescription: \"A member skill that restates the shared commit type convention in its own table so the agreement check has something concrete to compare against the declaration held in the skillset assets folder.\"\r\n---\r\n\r\n## Instructions\r\n\r\nFollow `../assets/commit-conventions.md` when choosing a type.\r\n\r\n| Type | Changelog section |\r\n| --- | --- |\r\n| `feat` | Added |\r\n| `fix` | Fixed |\r\n"
       },
       "expectedCoherence": {
         "membersChecked": 2,

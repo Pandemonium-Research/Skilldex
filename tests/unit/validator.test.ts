@@ -82,6 +82,83 @@ describe('validateSkill', () => {
     expect(result.diagnostics.some((d) => d.check === 'referenced-resources' && d.severity === 'error')).toBe(false)
   })
 
+  // --- Parity with skilldex-registry's validator -------------------------------------------
+  //
+  // Both implement the same rubric from separate code, and the shared conformance corpus is
+  // generated from this side — so it pins the registry to skilldex and can never catch skilldex
+  // drifting. These cases are that half of the contract. Each one was a live disagreement
+  // between the two validators before 2026-09-15.
+
+  it('resolves a reference that carries a fragment anchor', async () => {
+    const result = await validateSkill(fixtures('anchored-ref-valid-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('pass')
+  })
+
+  it('resolves a reference that carries a link title', async () => {
+    const result = await validateSkill(fixtures('titled-ref-valid-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('pass')
+  })
+
+  it('reads a command line as a reference to the script, not to the script plus its flags', async () => {
+    const result = await validateSkill(fixtures('command-ref-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('pass')
+  })
+
+  it('resolves a dot-relative reference', async () => {
+    const result = await validateSkill(fixtures('dot-relative-ref-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('pass')
+  })
+
+  it('does not treat a link target that names no file as a file reference', async () => {
+    // `[image](raw_image)` is not a path, and neither is an external URL or a bare anchor.
+    // Reporting them as missing files cost a skill the whole seven-point check.
+    const result = await validateSkill(fixtures('non-path-link-skill'))
+    expect(
+      result.diagnostics.some((d) => d.check === 'referenced-resources' && d.severity === 'error')
+    ).toBe(false)
+  })
+
+  it('reports a reference that climbs out of the skill folder', async () => {
+    // A skill is installed as a folder on its own, so whatever sits beside this fixture in the
+    // repository is not there for whoever installs it.
+    const result = await validateSkill(fixtures('escaping-ref-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'referenced-resources')
+    expect(diag?.severity).toBe('error')
+    expect(diag?.message).toMatch(/outside the skill folder/)
+  })
+
+  it('does not count a dot-directory as an unknown subdirectory', async () => {
+    // A skill at a repository root sits beside .git/ and .github/. Counting those penalised it
+    // for where it is kept rather than how it is built.
+    const result = await validateSkill(fixtures('dot-dir-skill'))
+    expect(result.diagnostics.some((d) => d.check === 'allowed-subdirs' && d.severity === 'warning'))
+      .toBe(false)
+  })
+
+  it('finds a misplaced file nested below the top level of a bundled folder', async () => {
+    const result = await validateSkill(fixtures('nested-misplaced-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'bundled-resources')
+    expect(diag?.severity).toBe('warning')
+    expect(diag?.message).toMatch(/setup\/install\.sh/)
+  })
+
+  it('judges a misplaced file by its extension regardless of case', async () => {
+    const result = await validateSkill(fixtures('uppercase-ext-skill'))
+    const diag = result.diagnostics.find((d) => d.check === 'bundled-resources')
+    expect(diag?.severity).toBe('warning')
+    expect(diag?.message).toMatch(/Setup\.PY/)
+  })
+
+  it('accepts a frontmatter fence with a trailing space', async () => {
+    const result = await validateSkill(fixtures('frontmatter-trailing-space-skill'))
+    expect(result.score).toBe(100)
+    expect(result.diagnostics.find((d) => d.check === 'yaml-frontmatter')?.severity).toBe('pass')
+  })
+
   it('flags a name that is not kebab-case', async () => {
     const result = await validateSkill(fixtures('bad-name-skill'))
     const diag = result.diagnostics.find((d) => d.check === 'name-format')
