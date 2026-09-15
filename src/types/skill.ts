@@ -1,11 +1,15 @@
-export interface SkillFrontmatter {
-  name: string
-  description: string
-  version?: string
-  tags?: string[]
-  author?: string
-  specVersion?: string
-}
+// The validation types are the rubric's, and the rubric now lives in one package shared with the
+// registry (@skilldex/validator). Re-exported here so that every call site in this repo keeps its
+// existing import, and so there is still one name for them locally.
+import type { SkillFrontmatter } from '@skilldex/validator'
+
+export type {
+  CheckScore,
+  SkillFrontmatter,
+  ValidationDiagnostic,
+  ValidationResult,
+  ValidationSeverity,
+} from '@skilldex/validator'
 
 export interface SkillPackage {
   name: string
@@ -17,42 +21,3 @@ export interface SkillPackage {
   hasAssets: boolean
 }
 
-export type ValidationSeverity = 'error' | 'warning' | 'pass'
-
-export interface ValidationDiagnostic {
-  severity: ValidationSeverity
-  line?: number
-  message: string
-  check: string
-}
-
-/**
- * One check's share of the aggregate score.
- *
- * The aggregate hides what it is made of: a skill can score 94 while failing the check that
- * decides whether an agent ever invokes it. Reporting each check's points beside the total makes
- * that visible without asking anyone to trust the total.
- */
-export interface CheckScore {
-  check: string
-  earned: number
-  possible: number
-  /**
-   * The worst severity this check emitted, or `skipped` when it never ran because something it
-   * depends on failed first — a missing description has no length to measure. Kept distinct from
-   * a failure so that 0 points for "not evaluated" does not read as 0 points for "failed".
-   */
-  status: ValidationSeverity | 'skipped'
-}
-
-export interface ValidationResult {
-  skill: string
-  score: number
-  diagnostics: ValidationDiagnostic[]
-  specVersion: string
-  passCount: number
-  warnCount: number
-  errorCount: number
-  /** Every scored check, in a fixed order. `earned` sums to `score`. */
-  breakdown: CheckScore[]
-}
