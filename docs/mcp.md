@@ -257,25 +257,33 @@ Generate AI-powered skill suggestions based on project context.
 
 ### `skilldex_search`
 
-Search the Skilldex registry for skills.
-
-> **Status:** Stub — returns an empty result set. Full registry search is not yet implemented.
+Search the Skilldex registry for skills. Results are ranked by relevance.
 
 **Input:**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `query` | `string` | Yes | Search query |
+| `tier` | `"verified"` \| `"community"` | No | Filter by trust tier |
+| `limit` | `number` (1–50) | No | Number of results to return (default 10) |
 
 **Output:**
 
 ```json
 {
-  "results": [],
-  "total": 0,
-  "message": "Registry search is not yet available in this version."
+  "skills": [
+    { "name": "pdf-tools", "owner": "acme", "qualified_name": "acme/pdf-tools", "description": "…", "trust_tier": "community", "score": 90 }
+  ],
+  "total": 1000,
+  "total_relation": "gte",
+  "query": "pdf"
 }
 ```
+
+`total_relation` says how to read `total`. `"eq"` is an exact count. `"gte"` means the registry stopped
+counting at its cap — 1,000 — and there are at least that many, so treat `total` as a floor, never as
+the number of matches. Install a result by its `qualified_name`: bare names are shared by several
+owners, and the registry refuses an ambiguous one.
 
 ---
 

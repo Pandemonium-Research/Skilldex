@@ -1,7 +1,7 @@
 import chalk from 'chalk'
 import ora from 'ora'
 import { searchRegistry } from '../../registry/sources/registry.js'
-import { printJson, printError, printInfo } from '../ui/output.js'
+import { printJson, printError, printInfo, formatTotal, pluralFor } from '../ui/output.js'
 import type { RegistrySkill, SearchSort } from '../../registry/sources/registry.js'
 
 function tierBadge(tier: RegistrySkill['trust_tier']): string {
@@ -73,7 +73,11 @@ export async function runSearch(
       return
     }
 
-    console.log(chalk.bold(`\nFound ${result.total} skill${result.total === 1 ? '' : 's'} for "${query}" (showing ${result.skills.length})`))
+    console.log(
+      chalk.bold(
+        `\nFound ${formatTotal(result.total, result.total_relation)} ${pluralFor(result.total, result.total_relation, 'skill')} for "${query}" (showing ${result.skills.length})`
+      )
+    )
     for (const skill of result.skills) {
       renderSkillCard(skill, 0)
     }

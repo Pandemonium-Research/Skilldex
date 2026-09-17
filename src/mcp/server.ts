@@ -215,6 +215,8 @@ export async function startMcpServer(): Promise<void> {
             text: JSON.stringify({
               skills: result.skills,
               total: result.total,
+              // "gte" means the registry stopped counting at its cap — `total` is a floor, not a count.
+              total_relation: result.total_relation ?? 'eq',
               query,
             }),
           },

@@ -1,7 +1,7 @@
 import chalk from 'chalk'
 import ora from 'ora'
 import { searchSkillsets } from '../../registry/sources/registry.js'
-import { printJson, printError, printInfo } from '../ui/output.js'
+import { printJson, printError, printInfo, formatTotal, pluralFor } from '../ui/output.js'
 import {
   formatCoherence,
   registryCoherenceCounts,
@@ -110,7 +110,7 @@ export async function runSkillsetSearch(
     const forQuery = query ? ` for "${query}"` : ''
     console.log(
       chalk.bold(
-        `\nFound ${result.total} skillset${result.total === 1 ? '' : 's'}${forQuery} (showing ${result.skillsets.length})`
+        `\nFound ${formatTotal(result.total, result.total_relation)} ${pluralFor(result.total, result.total_relation, 'skillset')}${forQuery} (showing ${result.skillsets.length})`
       )
     )
     for (const skillset of result.skillsets) {
