@@ -238,7 +238,7 @@ These areas are explicitly out of scope for the current MVP and will be addresse
 
 | Feature | Status |
 |---|---|
-| Registry search | Phase 5 — `skilldex_search` is a stub |
+| ~~Registry search~~ | Done — `skilldex_search` queries the registry and reports capped totals with `total_relation` |
 | `skillpm publish` | Phase 5 — exits with error |
 | Official Anthropic registry source | Phase 5 |
 | Registry cache (`~/.skilldex/cache/`) | Phase 5 |
