@@ -100,9 +100,17 @@ export interface SearchOptions {
   signal?: AbortSignal
 }
 
+/**
+ * "eq": `total` is exact. "gte": the registry stopped counting at its cap (1,000 since the registry's
+ * D27) and there are at least that many. Optional because registries predating bounded counting
+ * omit it, and an absent relation is exact.
+ */
+export type TotalRelation = 'eq' | 'gte'
+
 export interface SearchResponse {
   skills: RegistrySkill[]
   total: number
+  total_relation?: TotalRelation
   limit: number
   offset: number
 }
@@ -306,6 +314,7 @@ export interface SkillsetInstallInfo {
 export interface SkillsetSearchResponse {
   skillsets: RegistrySkillset[]
   total: number
+  total_relation?: TotalRelation
   limit: number
   offset: number
 }

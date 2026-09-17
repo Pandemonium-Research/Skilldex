@@ -82,3 +82,19 @@ export function printWarning(message: string): void {
 export function printInfo(message: string): void {
   console.log(chalk.dim(message))
 }
+
+/**
+ * A registry result count, the way the registry means it.
+ *
+ * The registry stops counting at a cap and says so with `total_relation: "gte"`. Printing the bare
+ * number states a total nobody computed: a search matching 40,000 skills printed "Found 1000 skills".
+ * A capped count reads "1,000+" instead.
+ */
+export function formatTotal(total: number, relation?: 'eq' | 'gte'): string {
+  return `${total.toLocaleString('en-US')}${relation === 'gte' ? '+' : ''}`
+}
+
+/** "skill" or "skills" for a count as formatTotal renders it — "1,000+" is always plural. */
+export function pluralFor(total: number, relation: 'eq' | 'gte' | undefined, noun: string): string {
+  return total === 1 && relation !== 'gte' ? noun : `${noun}s`
+}
