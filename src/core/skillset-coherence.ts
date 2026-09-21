@@ -33,9 +33,10 @@ export type {
 
 export async function checkSkillsetCoherence(
   skillsetPath: string,
-  embeddedSkills: string[]
+  embeddedSkills: string[],
+  memberDirs: Record<string, string> = {}
 ): Promise<SkillsetCoherenceResult> {
-  return checkCoherence(await workingTreeSource(path.resolve(skillsetPath)), embeddedSkills)
+  return checkCoherence(await workingTreeSource(path.resolve(skillsetPath), memberDirs), embeddedSkills)
 }
 
 /**
@@ -45,10 +46,29 @@ export async function checkSkillsetCoherence(
  * changed halfway through would make the result depend on the order the checks happened to run in.
  * Reads are memoized: collecting declared conventions and hunting undeclared ones both walk every
  * shared asset.
+ *
+ * `memberDirs` maps a member's name to where its files actually live. An *installed* skillset keeps
+ * its members in `<root>/skills/<name>` rather than inside itself, so without this the coherence check
+ * would be handed a skillset with no members and pass having compared nothing (A17).
  */
-async function workingTreeSource(root: string): Promise<CoherenceSource> {
-  const files = await listFiles(root)
+async function workingTreeSource(
+  root: string,
+  memberDirs: Record<string, string> = {}
+): Promise<CoherenceSource> {
+  const own = await listFiles(root)
+  const external = await Promise.all(
+    Object.entries(memberDirs).map(async ([name, dir]) =>
+      (await listFiles(dir)).map((f) => `${name}/${f}`)
+    )
+  )
+  const files = [...own, ...external.flat()]
   const cache = new Map<string, string | null>()
+
+  const resolve = (relPath: string): string => {
+    const [head, ...rest] = relPath.split('/')
+    const dir = memberDirs[head]
+    return dir && rest.length > 0 ? path.join(dir, ...rest) : path.join(root, ...relPath.split('/'))
+  }
 
   return {
     listFiles: () => files,
@@ -58,7 +78,7 @@ async function workingTreeSource(root: string): Promise<CoherenceSource> {
 
       let content: string | null
       try {
-        content = await readFile(path.join(root, ...relPath.split('/')), 'utf8')
+        content = await readFile(resolve(relPath), 'utf8')
       } catch {
         content = null
       }

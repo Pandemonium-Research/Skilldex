@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -114,5 +114,49 @@ describe('validateSkillset', () => {
     const result = await validateSkillset(fixtures('valid-skillset'))
     expect(result.score).toBeGreaterThanOrEqual(0)
     expect(result.score).toBeLessThanOrEqual(100)
+  })
+})
+
+describe('an installed skillset', () => {
+  // `skillset install` copies SKILLSET.md and assets/ into <root>/skillsets/<name> and puts the members
+  // in <root>/skills/<name>, recording them in the manifest. Validating the installed copy used to find
+  // no members: it lost the points for having any and passed coherence having compared nothing (A17).
+  async function installedLayout(perfSection: string): Promise<string> {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'skilldex-installed-'))
+    const set = path.join(root, 'skillsets', 'demo')
+    await mkdir(path.join(set, 'assets'), { recursive: true })
+    await writeFile(path.join(set, 'SKILLSET.md'),
+      '---\nname: demo\ndescription: "A demo skillset holding one member skill and one shared asset that declares a single commit-type convention, written at the length the description check asks for so that the only thing this fixture can lose points on is whether its member was found and checked at all."\nversion: "1.0.0"\n---\n\n# demo\n')
+    await writeFile(path.join(set, 'assets', 'conventions.md'),
+      '# Conventions\n\n```yaml skilldex-conventions\ncommit-type-to-changelog-section:\n  feat: Added\n  perf: Changed\n```\n')
+    const member = path.join(root, 'skills', 'writer')
+    await mkdir(member, { recursive: true })
+    await writeFile(path.join(member, 'SKILL.md'),
+      '---\nname: writer\ndescription: "Writes changelog entries from commits, restating the declared commit-type mapping of its bundle for its own use."\n---\n\nSections follow the conventions in `../assets/conventions.md`:\n\n| Commit type | Changelog section |\n|---|---|\n| `feat` | Added |\n| `perf` | ' + perfSection + ' |\n')
+    await writeFile(path.join(root, 'skilldex.json'), JSON.stringify({
+      skilldexVersion: '1', scope: 'project',
+      skills: { writer: { name: 'writer', path: 'skills/writer' } },
+      skillsets: { demo: { name: 'demo', embeddedSkills: ['writer'], remoteSkills: [] } },
+    }))
+    return set
+  }
+
+  it('checks the members the manifest records, not the empty directory', async () => {
+    const set = await installedLayout('Changed')
+    const result = await validateSkillset(set)
+    expect(result.embeddedSkills).toEqual(['writer'])
+    expect(result.coherence?.membersChecked).toBe(1)
+    expect(result.coherence?.membersCoherent).toBe(1)
+    expect(result.score).toBe(100)
+  })
+
+  it('flags a member that contradicts the declared convention', async () => {
+    // "Added" is a value the declaration itself uses, so this is a contradiction rather than a
+    // value the check cannot verify against the declared vocabulary.
+    const set = await installedLayout('Added')
+    const result = await validateSkillset(set)
+    expect(result.coherence?.membersChecked).toBe(1)
+    expect(result.coherence?.membersCoherent).toBe(0)
+    expect(result.coherence?.diagnostics.some((d) => d.severity === 'error')).toBe(true)
   })
 })

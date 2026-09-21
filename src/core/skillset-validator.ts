@@ -21,6 +21,7 @@ import { checkSkillsetCoherence } from './skillset-coherence.js'
 export { SKILLSET_SPEC_VERSION }
 
 const SKILLSET_MD = 'SKILLSET.md'
+const SKILL_MD = 'SKILL.md'
 
 export async function validateSkillset(skillsetPath: string): Promise<SkillsetValidationResult> {
   const absPath = path.resolve(skillsetPath)
@@ -41,16 +42,71 @@ export async function validateSkillset(skillsetPath: string): Promise<SkillsetVa
     return fatal(skillsetPath, `SKILLSET.md not found in ${absPath}`)
   }
 
+  // An installed skillset holds only SKILLSET.md and assets/: `skillset install` puts the members in
+  // <root>/skills/<name> and records them in the manifest. Validating it as it sits on disk would find no
+  // members — losing the points for having any, and passing coherence having compared nothing (A17). The
+  // manifest says which skills are its members and where they are, so read them from there.
+  const memberDirs = await installedMemberDirs(absPath)
+  const files = [
+    ...(await listFiles(absPath)),
+    ...(await Promise.all(
+      Object.entries(memberDirs).map(async ([name, dir]) =>
+        (await listFiles(dir)).map((f) => `${name}/${f}`)
+      )
+    )).flat(),
+  ]
+
   const result = validateSkillsetContent({
     skillsetMd,
-    files: await listFiles(absPath),
+    files,
     name: path.basename(absPath),
   })
 
   // Unconditionally, including for a memberless skillset: the check still reports what the shared
   // assets declare, and short-circuiting here would make that depend on whether anyone had added a
   // member yet.
-  return { ...result, coherence: await checkSkillsetCoherence(absPath, result.embeddedSkills) }
+  return {
+    ...result,
+    coherence: await checkSkillsetCoherence(absPath, result.embeddedSkills, memberDirs),
+  }
+}
+
+/**
+ * Where an installed skillset's members really are, from the manifest, or `{}` for a source directory.
+ *
+ * Recognised by layout: `<root>/skillsets/<name>` beside a `<root>/skilldex.json` that lists the skillset.
+ * Each member is taken from its own manifest entry's path, falling back to `skills/<name>`, and only if it
+ * has a SKILL.md — a member uninstalled by hand is simply missing, which the checks should then say.
+ */
+async function installedMemberDirs(absPath: string): Promise<Record<string, string>> {
+  if (path.basename(path.dirname(absPath)) !== 'skillsets') return {}
+  const root = path.dirname(path.dirname(absPath))
+
+  let manifest: {
+    skills?: Record<string, { path?: string }>
+    skillsets?: Record<string, { embeddedSkills?: string[] }>
+  }
+  try {
+    manifest = JSON.parse(await readFile(path.join(root, 'skilldex.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+
+  const entry = manifest.skillsets?.[path.basename(absPath)]
+  if (!entry?.embeddedSkills?.length) return {}
+
+  const dirs: Record<string, string> = {}
+  for (const name of entry.embeddedSkills) {
+    const rel = manifest.skills?.[name]?.path ?? path.join('skills', name)
+    const dir = path.resolve(root, rel)
+    try {
+      await stat(path.join(dir, SKILL_MD))
+      dirs[name] = dir
+    } catch {
+      // not installed any more; leave it out and let the member checks report it
+    }
+  }
+  return dirs
 }
 
 // --- Helpers ---
