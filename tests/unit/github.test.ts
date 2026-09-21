@@ -42,6 +42,15 @@ describe('parseGitUrl', () => {
     expect(result.subPath).toBeUndefined()
   })
 
+  it('reads tree/HEAD as the default branch, not a branch named HEAD', () => {
+    // The registry records every imported skill this way, and `git clone --branch HEAD` fails, so
+    // HEAD must reach git as no --branch at all — which clones the default branch.
+    const result = parseGitUrl('git+https://github.com/user/repo/tree/HEAD/skills/my-skill')
+    expect(result.repoUrl).toBe('https://github.com/user/repo')
+    expect(result.branch).toBeUndefined()
+    expect(result.subPath).toBe('skills/my-skill')
+  })
+
   it('handles URL without git+ prefix', () => {
     const result = parseGitUrl('https://github.com/user/repo')
     expect(result.repoUrl).toBe('https://github.com/user/repo')

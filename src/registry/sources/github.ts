@@ -20,7 +20,13 @@ export function parseGitUrl(raw: string): ParsedGitUrl {
   if (treeMatch) {
     return {
       repoUrl: treeMatch[1],
-      branch: treeMatch[2],
+      // `HEAD` names the repository's default branch, and it is how the registry records every skill
+      // imported from the GitSkills corpus — 1.61M of its rows (Skilldex-registry D14: the dataset
+      // carries no default branch, and `main` would 404 on every master-default repository). git
+      // takes HEAD as a ref almost everywhere, but not as `clone --branch`, which fails with "Remote
+      // branch HEAD not found": no imported skill could be installed. Leaving the branch unset clones
+      // the default branch, which is what HEAD means. Every clone site reads the branch from here.
+      branch: treeMatch[2] === 'HEAD' ? undefined : treeMatch[2],
       subPath: treeMatch[3]?.replace(/^\//, ''),
     }
   }
