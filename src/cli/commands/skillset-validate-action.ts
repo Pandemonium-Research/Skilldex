@@ -12,6 +12,10 @@ export async function runSkillsetValidate(
 
     if (options.json) {
       printJson(result)
+      // Same exit rules as the human-readable path below, so `--json` is usable as a CI gate.
+      if (result.errorCount > 0 || (options.strict && result.coherence.errorCount > 0)) {
+        process.exit(1)
+      }
       return
     }
 
