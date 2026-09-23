@@ -214,79 +214,77 @@ export async function bridgeSkill(
   projectRoot: string
 ): Promise<BridgeLink[]> {
   const results: BridgeLink[] = []
-
   for (const { dir } of await applicableTargets(scope, projectRoot)) {
-    const link = path.join(dir, skillName)
-    const owned = await bridgeOwnership(link, installedPath)
+    results.push(await bridgeEntry(path.join(dir, skillName), installedPath))
+  }
+  return results
+}
 
-    // A symlink is already live — it resolves to whatever the source holds now, so there is
-    // nothing to do however many times the skill is reinstalled or updated.
-    if (owned === 'symlink') {
-      results.push({ target: link, linked: true, mechanism: 'symlink' })
-      continue
-    }
+/**
+ * Serve `source` at `link`: a symlink, a junction where Windows refuses one, a marked copy where
+ * neither can be made. One entry of {@link bridgeSkill}, exported for the other things that must
+ * sit beside the skills — a skillset's shared `assets/`, which its members reach as `../assets/`.
+ *
+ * An entry that exists and is not ours is **never** overwritten.
+ */
+export async function bridgeEntry(link: string, source: string): Promise<BridgeLink> {
+  const owned = await bridgeOwnership(link, source)
 
-    // A copy is a snapshot and does not follow the source, so re-bridging has to rewrite it.
-    // Every update goes through installFromPath with force, which lands here: leaving the copy
-    // alone would let `skillpm update` report success while the harness kept reading the old
-    // skill. Silent staleness is worse than a loud failure.
-    if (owned === 'copy') {
-      await rm(link, { recursive: true, force: true })
-      await copyBridge(installedPath, link)
-      results.push({ target: link, linked: true, mechanism: 'copy' })
-      continue
-    }
+  // A symlink is already live — it resolves to whatever the source holds now, so there is
+  // nothing to do however many times the skill is reinstalled or updated.
+  if (owned === 'symlink') return { target: link, linked: true, mechanism: 'symlink' }
 
-    let occupied = false
-    try {
-      await lstat(link)
-      occupied = true
-    } catch {
-      // free
-    }
-
-    if (occupied) {
-      results.push({
-        target: link,
-        linked: false,
-        conflict: 'exists and was not created by skilldex',
-      })
-      continue
-    }
-
-    await mkdir(dir, { recursive: true })
-    try {
-      await symlink(installedPath, link, 'dir')
-      results.push({ target: link, linked: true, mechanism: 'symlink' })
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'EPERM') throw e
-
-      // EPERM is Windows without developer mode, where an unprivileged process cannot create a
-      // symlink. A junction can be created without any privilege, and is a real reparse point:
-      // lstat reports isSymbolicLink, readlink returns the target, and removing one unlinks the
-      // junction rather than deleting through it. Everything downstream is therefore unchanged.
-      //
-      // Preferring it to a copy is not a tidiness point. A copy is a snapshot that silently goes
-      // stale, doubles the bytes on disk, and — before the marker below existed — could not be
-      // told apart from a directory the user wrote by hand. A junction has none of those
-      // problems, and it is available on precisely the machines that were falling back to copying.
-      if (process.platform === 'win32') {
-        try {
-          await symlink(installedPath, link, 'junction')
-          results.push({ target: link, linked: true, mechanism: 'symlink' })
-          continue
-        } catch {
-          // Junctions are local-volume and directory-only; fall through for anything they
-          // cannot express rather than failing the install.
-        }
-      }
-
-      await copyBridge(installedPath, link)
-      results.push({ target: link, linked: true, mechanism: 'copy' })
-    }
+  // A copy is a snapshot and does not follow the source, so re-bridging has to rewrite it.
+  // Every update goes through installFromPath with force, which lands here: leaving the copy
+  // alone would let `skillpm update` report success while the harness kept reading the old
+  // skill. Silent staleness is worse than a loud failure.
+  if (owned === 'copy') {
+    await rm(link, { recursive: true, force: true })
+    await copyBridge(source, link)
+    return { target: link, linked: true, mechanism: 'copy' }
   }
 
-  return results
+  let occupied = false
+  try {
+    await lstat(link)
+    occupied = true
+  } catch {
+    // free
+  }
+
+  if (occupied) {
+    return { target: link, linked: false, conflict: 'exists and was not created by skilldex' }
+  }
+
+  await mkdir(path.dirname(link), { recursive: true })
+  try {
+    await symlink(source, link, 'dir')
+    return { target: link, linked: true, mechanism: 'symlink' }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EPERM') throw e
+
+    // EPERM is Windows without developer mode, where an unprivileged process cannot create a
+    // symlink. A junction can be created without any privilege, and is a real reparse point:
+    // lstat reports isSymbolicLink, readlink returns the target, and removing one unlinks the
+    // junction rather than deleting through it. Everything downstream is therefore unchanged.
+    //
+    // Preferring it to a copy is not a tidiness point. A copy is a snapshot that silently goes
+    // stale, doubles the bytes on disk, and — before the marker below existed — could not be
+    // told apart from a directory the user wrote by hand. A junction has none of those
+    // problems, and it is available on precisely the machines that were falling back to copying.
+    if (process.platform === 'win32') {
+      try {
+        await symlink(source, link, 'junction')
+        return { target: link, linked: true, mechanism: 'symlink' }
+      } catch {
+        // Junctions are local-volume and directory-only; fall through for anything they
+        // cannot express rather than failing the install.
+      }
+    }
+
+    await copyBridge(source, link)
+    return { target: link, linked: true, mechanism: 'copy' }
+  }
 }
 
 /**
@@ -311,11 +309,15 @@ export async function unbridgeSkill(
   // (the harness was removed), and a link we created must still be ours to clean up.
   for (const { dir } of bridgeTargets(scope, projectRoot)) {
     const link = path.join(dir, skillName)
-    if (await bridgeOwnership(link, installedPath)) {
-      await rm(link, { recursive: true, force: true })
-      removed.push(link)
-    }
+    if (await unbridgeEntry(link, installedPath)) removed.push(link)
   }
 
   return removed
+}
+
+/** Remove `link` if it is our bridge to `source`; report whether it was removed. */
+export async function unbridgeEntry(link: string, source: string): Promise<boolean> {
+  if (!(await bridgeOwnership(link, source))) return false
+  await rm(link, { recursive: true, force: true })
+  return true
 }

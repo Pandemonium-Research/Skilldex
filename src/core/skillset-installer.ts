@@ -7,7 +7,17 @@ import type { InstallResult } from './installer.js'
 import { validateSkillset, SKILLSET_SPEC_VERSION } from './skillset-validator.js'
 import { resolveScope } from './resolver.js'
 import { addSkillsetToManifest, removeSkillsetFromManifest, readManifest } from './manifest.js'
-import { installFromPath, uninstallSkill } from './installer.js'
+import { installFromPath, uninstallSkill, projectRootFor } from './installer.js'
+import {
+  bridgeEntry,
+  bridgeSkill,
+  unbridgeEntry,
+  unbridgeSkill,
+  type BridgeLink,
+} from './harness-bridge.js'
+
+/** The skillset-level directory members reference as `../assets/…`. */
+const ASSETS_DIR = 'assets'
 
 export interface SkillsetInstallOptions {
   scope: ScopeLevel
@@ -24,6 +34,8 @@ export interface SkillsetInstallResult {
   embeddedResults: InstallResult[]
   remoteResults: InstallResult[]
   alreadyExisted: boolean
+  /** Where the shared assets are served beside the members (empty for a skillset without assets). */
+  assetLinks: BridgeLink[]
 }
 
 export async function installSkillsetFromPath(
@@ -66,6 +78,7 @@ export async function installSkillsetFromPath(
       embeddedResults: [],
       remoteResults: [],
       alreadyExisted,
+      assetLinks: [],
     }
   }
 
@@ -98,12 +111,31 @@ export async function installSkillsetFromPath(
   await mkdir(targetDir, { recursive: true })
   await cp(path.join(absSource, 'SKILLSET.md'), path.join(targetDir, 'SKILLSET.md'))
 
-  const assetsPath = path.join(absSource, 'assets')
+  const assetsPath = path.join(absSource, ASSETS_DIR)
+  let hasAssets = false
   try {
     await stat(assetsPath)
-    await cp(assetsPath, path.join(targetDir, 'assets'), { recursive: true })
+    hasAssets = true
   } catch {
     // no assets dir — that's fine
+  }
+  if (hasAssets) await cp(assetsPath, path.join(targetDir, ASSETS_DIR), { recursive: true })
+
+  // Members reach the shared assets as `../assets/…`, relative to wherever the member is read from.
+  // In the source that is the skillset directory; once installed, the members sit in skills/<name>
+  // and in every harness directory they are linked into, while the assets sit in
+  // skillsets/<name>/assets — so `../assets` found nothing, and an agent following a member's own
+  // instruction to load the shared convention could not. Serve the assets beside the members:
+  // in skills/, for a path resolved through the member's link, and in each harness directory, for
+  // a path resolved as text from where the harness found the member. One `assets` entry fits in a
+  // directory, so a second skillset with its own assets is reported as a conflict, never swapped in.
+  let assetLinks: BridgeLink[] = []
+  if (hasAssets) {
+    const shared = path.join(targetDir, ASSETS_DIR)
+    assetLinks = [
+      await bridgeEntry(path.join(scopeConfig.skillsDir, ASSETS_DIR), shared),
+      ...(await bridgeSkill(ASSETS_DIR, shared, options.scope, projectRootFor(scopeConfig))),
+    ]
   }
 
   const installed: InstalledSkillset = {
@@ -129,6 +161,7 @@ export async function installSkillsetFromPath(
     embeddedResults,
     remoteResults,
     alreadyExisted,
+    assetLinks,
   }
 }
 
@@ -152,8 +185,12 @@ export async function uninstallSkillset(skillsetName: string, scope: ScopeLevel)
     }
   }
 
-  // Remove the skillset directory
+  // Remove the skillset directory, and first the entries serving its assets beside the members —
+  // only those that are still ours, which is checked against the assets they point at.
   const skillsetDir = path.join(scopeConfig.skillsetsDir, skillsetName)
+  const shared = path.join(skillsetDir, ASSETS_DIR)
+  await unbridgeEntry(path.join(scopeConfig.skillsDir, ASSETS_DIR), shared)
+  await unbridgeSkill(ASSETS_DIR, shared, scope, projectRootFor(scopeConfig))
   await rm(skillsetDir, { recursive: true, force: true })
 
   await removeSkillsetFromManifest(scopeConfig, skillsetName)

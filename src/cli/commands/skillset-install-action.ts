@@ -1,7 +1,7 @@
 import ora from 'ora'
 import type { ScopeLevel } from '../../types/scope.js'
 import { installSkillsetFromPath } from '../../core/skillset-installer.js'
-import { printJson, printError, printSuccess, printInfo } from '../ui/output.js'
+import { printJson, printError, printSuccess, printInfo, printWarning } from '../ui/output.js'
 import { formatCoherence, coherenceHint, coherenceJson } from '../ui/coherence.js'
 import { isRegistryName } from '../../core/source-kind.js'
 
@@ -55,6 +55,7 @@ export async function runSkillsetInstall(
         remoteSkills: result.remoteResults.map((r) => r.skillName),
         diagnostics: result.validation.diagnostics,
         coherence: coherenceJson(result.validation.coherence),
+        sharedAssets: result.assetLinks,
       })
     } else {
       printSuccess(scoreLine(result.validation.score, result.validation.coherence))
@@ -66,6 +67,12 @@ export async function runSkillsetInstall(
       ]
       if (allSkills.length > 0) {
         printInfo(`  Skills installed: ${allSkills.join(', ')}`)
+      }
+      // Members read the shared conventions as ../assets; where that cannot be served, say so.
+      for (const link of result.assetLinks.filter((l) => !l.linked)) {
+        printWarning(
+          `  Shared assets not served at ${link.target}: ${link.conflict} — members there cannot read ../assets`
+        )
       }
     }
   } catch (e) {
@@ -121,6 +128,7 @@ async function runRegistrySkillsetInstall(
         remoteSkills: result.remoteResults.map((r) => r.skillName),
         trust_tier: info.trust_tier,
         coherence: coherenceJson(result.validation.coherence),
+        sharedAssets: result.assetLinks,
       })
     } else {
       printSuccess(
@@ -134,6 +142,12 @@ async function runRegistrySkillsetInstall(
       ]
       if (allSkills.length > 0) {
         printInfo(`  Skills installed: ${allSkills.join(', ')}`)
+      }
+      // Members read the shared conventions as ../assets; where that cannot be served, say so.
+      for (const link of result.assetLinks.filter((l) => !l.linked)) {
+        printWarning(
+          `  Shared assets not served at ${link.target}: ${link.conflict} — members there cannot read ../assets`
+        )
       }
     }
   } catch (e) {
@@ -185,6 +199,7 @@ async function runGitSkillsetInstall(
         embeddedSkills: result.embeddedResults.map((r) => r.skillName),
         remoteSkills: result.remoteResults.map((r) => r.skillName),
         coherence: coherenceJson(result.validation.coherence),
+        sharedAssets: result.assetLinks,
       })
     } else {
       printSuccess(scoreLine(result.validation.score, result.validation.coherence))
@@ -196,6 +211,12 @@ async function runGitSkillsetInstall(
       ]
       if (allSkills.length > 0) {
         printInfo(`  Skills installed: ${allSkills.join(', ')}`)
+      }
+      // Members read the shared conventions as ../assets; where that cannot be served, say so.
+      for (const link of result.assetLinks.filter((l) => !l.linked)) {
+        printWarning(
+          `  Shared assets not served at ${link.target}: ${link.conflict} — members there cannot read ../assets`
+        )
       }
     }
   } catch (e) {

@@ -104,7 +104,7 @@ export async function installFromPath(
 }
 
 /** For project scope, `rootPath` is `<projectRoot>/.skilldex`; other scopes ignore this. */
-function projectRootFor(scopeConfig: { rootPath: string }): string {
+export function projectRootFor(scopeConfig: { rootPath: string }): string {
   return path.dirname(scopeConfig.rootPath)
 }
 
