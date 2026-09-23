@@ -254,8 +254,20 @@ export async function publishSkill(token: string, body: PublishBody): Promise<Pu
   })
 }
 
+/**
+ * Re-fetch and re-score a skill the caller published.
+ *
+ * The registry routes updates only as `PATCH /skills/{owner}/{name}` — names are unique per owner,
+ * not globally — and a publisher's skills live under their GitHub handle. `skillpm publish --update`
+ * sent `PATCH /skills/{name}`, which matches no route, so every update came back 404. The handle is
+ * read from `/auth/me` rather than decoded from the token, so the CLI does not depend on the
+ * token's format.
+ */
 export async function updateSkill(token: string, name: string): Promise<PublishResponse> {
-  return registryFetch<PublishResponse>(`/skills/${encodeSkillPath(name)}`, {
+  const me = await registryFetch<{ github_handle: string }>('/auth/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return registryFetch<PublishResponse>(`/skills/${encodeSkillPath(`${me.github_handle}/${name}`)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
   })
