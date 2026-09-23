@@ -175,6 +175,9 @@ Results are addressed as `owner/name`: names are only unique within an owner. A 
 ```bash
 # Run from inside your skill directory — source URL is auto-detected from git remote
 skillpm publish --tags forensics,analysis
+
+# Re-score an already-published skill after pushing changes
+skillpm publish --update
 ```
 
 The skill is published under your GitHub handle, as `<handle>/<name>`.

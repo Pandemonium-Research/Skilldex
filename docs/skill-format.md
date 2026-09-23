@@ -79,7 +79,7 @@ description: Analyzes log files, stack traces, and crash reports to identify the
 
 ### Line limit
 
-`SKILL.md` must be **under 500 lines** (per Anthropic's spec). The validator warns at 400 lines and errors at 500+.
+`SKILL.md` should be **under 500 lines** (Anthropic's spec recommends it rather than requiring it). The validator warns above 400 lines; above 500 it warns and the check earns no points.
 
 ---
 
@@ -181,7 +181,7 @@ Run scripts/setup.sh before starting.
 See [the spec](https://example.com/spec) for details.
 ```
 
-If a referenced file is missing, the validator emits a line-level error pointing to the reference. This is worth 15 points in the scoring system.
+If a referenced file is missing, the validator emits a line-level error pointing to the reference. This is worth 7 points in the scoring system.
 
 ---
 

@@ -122,13 +122,13 @@ Validate a skill folder and return its format conformance score.
 
 ### `skilldex_install`
 
-Install a skill from a local directory or a `git+https://` URL.
+Install a skill from the registry, a local directory, or a `git+https://` URL.
 
 **Input:**
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `source` | `string` | Yes | — | Local path or `git+https://` URL |
+| `source` | `string` | Yes | — | Registry name (`owner/name`), local path, or `git+https://` URL |
 | `scope` | `"global" \| "shared" \| "project"` | No | `"project"` | Installation scope |
 | `force` | `boolean` | No | `false` | Overwrite if already installed |
 
@@ -145,7 +145,9 @@ Install a skill from a local directory or a `git+https://` URL.
 ```
 
 **Example prompt to Claude Code:**
-> "Install the forensics-agent skill from git+https://github.com/acme/forensics-agent at project scope."
+> "Install anthropics/pdf at project scope."
+
+A bare registry name that several owners publish is not guessed at: the tool returns the qualified candidates so the agent can retry with one.
 
 ---
 
@@ -219,7 +221,7 @@ List installed skills across scopes.
 
 ### `skilldex_suggest`
 
-Generate AI-powered skill suggestions based on project context.
+Suggest registry skills for a project: search the registry from the project's context, then have Claude choose from the results.
 
 **Input:**
 
@@ -227,26 +229,7 @@ Generate AI-powered skill suggestions based on project context.
 |---|---|---|---|
 | `projectPath` | `string` | No | Path to project. Defaults to the server's working directory. |
 
-**Output:**
-
-```json
-{
-  "proposals": [
-    {
-      "skillName": "forensics-agent",
-      "reason": "Your README mentions log analysis and debugging production incidents",
-      "suggestedScope": "project",
-      "available": true
-    },
-    {
-      "skillName": "test-writer",
-      "reason": "package.json has extensive test scripts",
-      "suggestedScope": "project",
-      "available": true
-    }
-  ]
-}
-```
+**Output:** the same JSON as `skillpm suggest --json` — `proposals` identified by `qualifiedName` (`owner/name`, installable as-is with `skilldex_install`), `gaps` the registry has no skill for, the `queries` that were run, and a `search` summary. See [suggest.md](suggest.md#json-output).
 
 **Requirements:** `ANTHROPIC_API_KEY` must be set in the server's environment (see setup above). Alternatively, point it at a custom Anthropic-compatible endpoint with `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` — see [suggest.md](suggest.md#custom-endpoints).
 

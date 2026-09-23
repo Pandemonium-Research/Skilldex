@@ -54,79 +54,55 @@ These also apply to the `skilldex_suggest` MCP tool — set them in the server's
 ## How It Works
 
 ```
-1. Skilldex reads your project context
-2. Claude proposes a list of skills
-3. You approve, reject, or reassign the scope of each
-4. Approved skills are installed
+1. Skilldex reads your project and builds a profile
+2. It searches the registry with terms drawn from that profile
+3. Claude chooses the best fits from the search results — and names needs the registry cannot meet
+4. You approve, skip, or reassign the scope of each proposal
+5. Approved skills are installed by owner/name; unmet needs can be drafted as new skills
 ```
 
-### Step 1 — Context gathering
+The model never invents a skill name. It can only choose from what the registry search returned, so every proposal is a real skill that installs as-is.
 
-Skilldex reads the following files from your project root (all optional — missing files are silently skipped):
+### Step 1 — Project profile
 
-| File | What's used |
-|---|---|
-| `README.md` | First 100 lines |
-| `README.txt` | First 100 lines (fallback) |
-| `package.json` | `name`, `description`, `scripts`, dependency names |
-| `.claude/` | Directory listing (file names only) |
-| `.skilldex/skilldex.json` | Names of already-installed skills (to avoid re-suggesting) |
+Skilldex reads the project without a model: its ecosystem, dependencies, languages and tooling (from `package.json`, `pyproject.toml`, `Cargo.toml` and similar), its docs (the README and other markdown), a listing of `.claude/`, and the skills already installed. Facts such as dependencies seed the registry search directly; prose is what tells the model what the project is for.
 
-The context is assembled into a summary and sent to Claude.
+If the profile is empty — nothing Skilldex can read — `suggest` says so and stops, instead of asking a model to guess.
 
-### Step 2 — Proposal generation
+### Step 2 — Registry search
 
-Claude is given the context and asked to return a structured list of skill proposals:
+Search terms from the profile are run against the registry. Searches that fail are reported, not swallowed: a thin result because some queries timed out would otherwise look like a project with few relevant skills. Skills already installed are left out.
 
-```json
-{
-  "proposals": [
-    {
-      "skillName": "forensics-agent",
-      "reason": "Needed for log analysis tasks described in your README",
-      "suggestedScope": "project"
-    }
-  ]
-}
-```
+### Step 3 — Selection
 
-The model used is `claude-sonnet-4-6` by default, overridable with `SKILLPM_SUGGEST_MODEL` (see [Custom Endpoints](#custom-endpoints)). The system prompt instructs the model to:
-- Suggest 3–7 skills maximum
-- Default `suggestedScope` to `project` unless there's a clear reason for `global` or `shared`
-- Not re-suggest already-installed skills
-- Only suggest skills that would realistically exist as Claude Code skills
+Claude is given the profile and the candidates and returns two lists:
 
-### Step 3 — Interactive approval
+- **proposals** — up to 7 of the candidates, each with a reason and a suggested scope. Each is identified by its `owner/name`, copied from the candidate list.
+- **gaps** — up to 3 needs no candidate meets, each with a kebab-case name, a purpose and a reason.
 
-Each proposed skill is presented with its reason and suggested scope:
+The model is `claude-sonnet-4-6` by default, overridable with `SKILLPM_SUGGEST_MODEL` (see [Custom Endpoints](#custom-endpoints)).
+
+### Step 4 — Interactive approval
 
 ```
 Proposed skills for this project:
-  1. forensics-agent             [project]
-     Needed for log analysis tasks described in your README
-  2. test-writer                 [project]
-     package.json has test scripts suggesting testing is important
-  3. code-reviewer               [shared]
-     Common for TypeScript projects
+  1. anthropics/pdf                         [project]  100/100
+     The README describes generating PDF reports from test results
 
-forensics-agent: Install?
+anthropics/pdf: Install?
   ❯ Yes (project scope)
     Yes (shared scope)
     Yes (global scope)
     Skip
 ```
 
-For each skill you can:
-- Install at project scope (default)
-- Install at shared scope
-- Install at global scope
-- Skip
+The suggested scope is the default choice.
 
-### Step 4 — Installation
+### Step 5 — Installation and drafts
 
-After you've reviewed all proposals, approved skills are installed in the order they were approved.
+Approved skills are installed exactly as `skillpm install <owner>/<name>` would install them.
 
-> **Note:** In the current MVP, the suggestion loop proposes skills by name but cannot auto-install them from the registry (registry search is not yet implemented). After approving, Skilldex tells you the `skillpm install git+<url>` command to run. Full auto-install will be available when the registry is live.
+Gaps are then listed under **Not in the registry — these would have to be written**. For each, Skilldex offers to draft the skill into your project; a draft that validates can be installed straight away, and one that does not is left for you to fix.
 
 ---
 
@@ -167,29 +143,48 @@ skillpm suggest --json
 {
   "proposals": [
     {
-      "skillName": "forensics-agent",
-      "reason": "Needed for log analysis tasks described in your README",
+      "qualifiedName": "anthropics/pdf",
+      "name": "pdf",
+      "owner": "anthropics",
+      "reason": "The README describes generating PDF reports from test results",
       "suggestedScope": "project",
-      "available": true
-    },
-    {
-      "skillName": "test-writer",
-      "reason": "package.json has test scripts suggesting testing is important",
-      "suggestedScope": "project",
-      "available": true
+      "trustTier": "verified",
+      "score": 100,
+      "sourceUrl": "https://github.com/anthropics/skills/tree/main/skills/pdf"
     }
-  ]
+  ],
+  "gaps": [
+    {
+      "name": "junit-report-parser",
+      "purpose": "Parse JUnit XML test reports into a failure summary",
+      "reason": "The CI config uploads JUnit reports, and no registry skill reads them"
+    }
+  ],
+  "queries": ["pdf", "junit", "vitest"],
+  "search": {
+    "candidates": 42,
+    "alreadyInstalled": [],
+    "elapsedMs": 1830,
+    "queries": []
+  }
 }
 ```
+
+With an empty project profile the output is `{ "proposals": [], "reason": "no-project-context", "projectRoot": "…" }`.
 
 **`SuggestionProposal` fields:**
 
 | Field | Type | Description |
 |---|---|---|
-| `skillName` | `string` | Kebab-case skill name |
+| `qualifiedName` | `string` | `owner/name` — installable as-is with `skillpm install` |
+| `name`, `owner` | `string` | The two halves of the qualified name (`owner` may be `null`) |
 | `reason` | `string` | One-sentence explanation of why this skill was proposed |
 | `suggestedScope` | `ScopeLevel` | Claude's suggestion for which scope to install at |
-| `available` | `boolean` | Whether the skill is findable in the registry (always `true` in current MVP) |
+| `trustTier` | `string` | `verified` or `community` |
+| `score` | `number \| null` | The skill's format conformance score in the registry |
+| `sourceUrl` | `string` | Where the skill is fetched from |
+
+A gap has no `qualifiedName`: it names something to write, not something to install.
 
 ---
 
@@ -206,7 +201,7 @@ The `skilldex_suggest` MCP tool exposes the same capability to Claude Code:
 }
 ```
 
-Returns the same `{ proposals }` JSON structure. See [docs/mcp.md](mcp.md) for the full tool schema.
+Returns the same JSON as `skillpm suggest --json`. See [docs/mcp.md](mcp.md) for the full tool schema.
 
 ---
 

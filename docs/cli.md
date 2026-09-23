@@ -20,10 +20,10 @@ spm     <command> [options]
 
 ## `skillpm install <source>`
 
-Install a skill from a local directory, a GitHub repository, or a tree URL.
+Install a skill from the registry, a local directory, a GitHub repository, or a tree URL.
 
 ```bash
-skillpm install <source> [--scope <level>] [--force] [--json]
+skillpm install <source> [--scope <level>] [--force] [--no-bridge] [--json]
 ```
 
 **Options:**
@@ -32,12 +32,17 @@ skillpm install <source> [--scope <level>] [--force] [--json]
 |---|---|---|
 | `-s, --scope <level>` | `project` | Installation scope: `global`, `shared`, or `project` |
 | `-f, --force` | `false` | Overwrite if the skill is already installed at this scope |
+| `--no-bridge` | — | Do not link the skill into agent directories (`.agents/skills`, `.claude/skills`) |
 | `--json` | `false` | Output result as JSON |
+
+The default scope can be changed with `skillpm config set defaultScope <level>`.
 
 **Source formats:**
 
 | Format | Example |
 |---|---|
+| Registry, qualified | `anthropics/pdf` |
+| Registry, bare name | `pdf` — if several owners publish it, `skillpm` asks which one (or, without a terminal, lists the qualified names and exits 1) |
 | Local path | `./my-skill` or `/absolute/path/to/skill` |
 | GitHub repo | `git+https://github.com/user/repo` |
 | GitHub repo with branch | `git+https://github.com/user/repo/tree/main` |
@@ -46,7 +51,10 @@ skillpm install <source> [--scope <level>] [--force] [--json]
 **Examples:**
 
 ```bash
-# Install from a local directory at project scope (default)
+# Install from the registry at project scope (default)
+skillpm install anthropics/pdf
+
+# Install from a local directory
 skillpm install ./forensics-agent
 
 # Install at global scope so it's available everywhere
@@ -78,21 +86,34 @@ skillpm install ./forensics-agent --json
 
 **Install flow:**
 
-1. Validates the skill folder (runs full format check)
-2. Shows validation report if there are warnings or errors
-3. Checks for conflicts at the same scope — throws if already installed (unless `--force`)
-4. Copies the skill folder into the scope's `skills/` directory
-5. Updates `skilldex.json` manifest with install metadata
+1. For a registry name, looks up the skill's source URL (and resolves an ambiguous bare name)
+2. Validates the skill folder (runs full format check)
+3. Shows validation report if there are warnings or errors
+4. Checks for conflicts at the same scope — throws if already installed (unless `--force`)
+5. Copies the skill folder into the scope's `skills/` directory
+6. Updates `skilldex.json` manifest with install metadata
+7. Links the skill into the agent directories for the scope — `.agents/skills/` and `.claude/skills/`, plus Qwen Code, Cline and Antigravity directories when those agents are present — unless `--no-bridge`
+
+A registry install prints the trust tier with the score:
+
+```
+✔ Installed "pdf" at project scope
+✓ Score: 100/100 · Trust: verified
+Linked into /path/to/project/.agents/skills/pdf
+Linked into /path/to/project/.claude/skills/pdf
+```
 
 Warnings never block installation. The user always decides.
 
 **GitHub installs:**
 
-When installing from a `git+https://` URL, Skilldex:
-1. Clones the repository into a temporary directory (shallow clone, `--depth 1`)
+When installing from a `git+https://` URL (and for registry installs, which resolve to one), Skilldex:
+1. Clones the repository into a temporary directory (shallow clone, `--depth 1`); `tree/HEAD` clones the default branch
 2. Searches for skill folders (directories containing `SKILL.md`)
-3. Validates and installs the first matching skill
+3. Validates and installs the skill — asking which one when the repository holds several
 4. Cleans up the temporary clone
+
+The source is recorded in the manifest as `git+https://…`, which is what `skillpm update` re-fetches.
 
 ---
 
@@ -296,7 +317,9 @@ skillpm suggest [--project-path <path>] [--yes] [--json]
 | `-y, --yes` | `false` | Auto-approve all suggestions without prompting |
 | `--json` | `false` | Output proposals as JSON without interactive prompts |
 
-**Requirements:** `ANTHROPIC_API_KEY` environment variable must be set.
+Proposals come only from registry search results — the model chooses among real skills, identified by `owner/name` — and approved ones install like `skillpm install <owner>/<name>`. Needs the registry cannot meet are listed separately, with an offer to draft them.
+
+**Requirements:** `ANTHROPIC_API_KEY` environment variable (or `skillpm config set anthropicApiKey`) must be set.
 
 **Examples:**
 
@@ -319,32 +342,13 @@ skillpm suggest --json
 Gathering project context...
 
 Proposed skills for this project:
-  1. forensics-agent             [project]
-     Needed for log analysis tasks described in your README
-  2. test-writer                 [project]
-     package.json has test scripts suggesting testing is important
-  3. code-reviewer               [shared]
-     Common for TypeScript projects
+  1. anthropics/pdf                         [project]  100/100
+     The README describes generating PDF reports from test results
 
-forensics-agent: Install? (Y/n/skip/scope)
-test-writer: Install? (Y/n/skip/scope)
-code-reviewer: Install? (Y/n/skip/scope)
+anthropics/pdf: Install? (Yes project / Yes shared / Yes global / Skip)
 ```
 
-**JSON output shape:**
-
-```json
-{
-  "proposals": [
-    {
-      "skillName": "forensics-agent",
-      "reason": "Needed for log analysis tasks described in your README",
-      "suggestedScope": "project",
-      "available": true
-    }
-  ]
-}
-```
+**JSON output:** `{ proposals, gaps, queries, search }`, with each proposal identified by `qualifiedName`.
 
 See [docs/suggest.md](suggest.md) for the full suggestion loop documentation.
 
@@ -352,9 +356,57 @@ See [docs/suggest.md](suggest.md) for the full suggestion loop documentation.
 
 ## `skillpm publish`
 
-Publish a skill to the Skilldex registry.
+Register a skill with the Skilldex registry. Run it from the skill's folder; the name comes from `SKILL.md`. The registry does not take an upload: it records the skill's GitHub URL, fetches `SKILL.md` from there, and scores it. The skill is published under your GitHub handle, as `<handle>/<name>`.
 
-> **Status:** Not yet implemented. Running this command exits with an error.
+```bash
+skillpm publish [--source-url <url>] [--tags <tags>] [--update] [--json]
+```
+
+| Flag | Description |
+|---|---|
+| `--source-url <url>` | GitHub URL of the skill. Detected from the folder's git remote if omitted |
+| `--tags <tags>` | Comma-separated tags |
+| `--update` | Re-fetch and re-score a skill you already published (from 1.5.5) |
+| `--json` | Output as JSON |
+
+Needs a publisher token: sign in at the registry's `/auth/github` (the command prints the URL when no token is set), then `skillpm config set token <token>` or set `SKILLDEX_TOKEN`.
+
+---
+
+## `skillpm search <query>`
+
+Search the registry. Results are addressed as `owner/name`; a count past the registry's cap prints as `1,000+`.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--tier <tier>` | all | `verified` or `community` |
+| `--sort <sort>` | relevance | `relevance`, `installs`, `score`, `recent`, `name` |
+| `--limit <n>` | `10` | Up to 50 |
+| `--json` | `false` | Raw registry response |
+
+---
+
+## `skillpm update [skill-name]`
+
+Re-fetch an installed skill from its recorded source, re-validate, and reinstall it. `--all` updates every skill in the scope; `--scope` defaults to `project`. Skills installed from a local path have no source and are skipped.
+
+---
+
+## `skillpm init [name]`
+
+Scaffold a skill: `./<name>/SKILL.md`, or `SKILL.md` in the current directory when no name is given. The name is checked against the validator's rules first, and the template validates clean as written.
+
+---
+
+## `skillpm skillset <subcommand>`
+
+`search`, `install`, `list`, `update`, `uninstall`, `init`, `validate` (`--strict` fails on a contradicted shared convention), and `publish`. Skillset names are not owner-qualified. See the README's Skillsets section.
+
+---
+
+## `skillpm config <subcommand>`
+
+`get [key]`, `set <key> <value>`, `unset <key>`, `list`. Keys: `registryUrl`, `token`, `anthropicApiKey`, `defaultScope`, stored in `~/.skilldex/config.json`; the matching environment variables (`SKILLDEX_REGISTRY_URL`, `SKILLDEX_TOKEN`, `ANTHROPIC_API_KEY`, `SKILLDEX_DEFAULT_SCOPE`) win over the file.
 
 ---
 

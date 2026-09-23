@@ -51,6 +51,17 @@ The agent loads only skills relevant to its current scope context. It does not l
 
 The global and shared scopes live in `~/.skilldex/` (the user's home directory). The project scope lives inside the project under `.skilldex/`.
 
+### Linking into agents
+
+Agents do not read `.skilldex/`. After each install, Skilldex links the skill into the directories agents do read, at the level that matches the scope:
+
+| Scope | Linked into |
+|---|---|
+| `project` | `<project>/.agents/skills/`, `<project>/.claude/skills/` (and `.qwen/skills/` if the project has `.qwen/`) |
+| `shared`, `global` | `~/.agents/skills/`, `~/.claude/skills/`, plus Qwen Code, Cline and Antigravity directories when those agents are installed |
+
+`.agents/skills/` is read by Codex, Gemini CLI, Cursor, Copilot, OpenCode and others; `.claude/skills/` by Claude Code, Cursor, Copilot, Cline and others. Links are symlinks (junctions on Windows) with a copy as the fallback. A directory already holding a different skill of the same name is left alone and reported. `--no-bridge` skips linking; uninstalling removes the links Skilldex made.
+
 ---
 
 ## Choosing the Right Scope

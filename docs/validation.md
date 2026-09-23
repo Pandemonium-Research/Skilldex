@@ -181,22 +181,18 @@ Only runs when `description` is present. All-or-nothing.
 
 ### SKILL.md line count (7 pts)
 
-**What it checks:** Whether `SKILL.md` is under the 500-line limit per Anthropic's spec.
+**What it checks:** Whether `SKILL.md` is under the 500 lines Anthropic's spec recommends. The spec recommends rather than requires it, so going over is a warning, never an error.
 
 | Lines | Result |
 |---|---|
-| ≤ 400 | Pass (15 pts) |
-| 401–499 | Warning (15 pts, but warns you're close) |
-| 500+ | Error (0 pts) |
+| ≤ 400 | Pass (7 pts) |
+| 401–500 | Warning (7 pts, but warns you're close) |
+| Over 500 | Warning (0 pts) |
 
-**Example warning output:**
+**Example output:**
 ```
-  warn    SKILL.md is 487 lines — approaching 500 line limit
-```
-
-**Example error output:**
-```
-  error   SKILL.md is 523 lines — exceeds 500 line limit
+  warn    SKILL.md is 487 lines — approaching the recommended 500
+  warn    SKILL.md is 523 lines — over the recommended 500
 ```
 
 ---
