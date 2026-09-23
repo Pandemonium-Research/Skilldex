@@ -11,9 +11,21 @@ export interface ParsedGitUrl {
   subPath?: string
 }
 
+/**
+ * A source URL with exactly one `git+` prefix, however many it arrived with.
+ *
+ * Every git install records the URL it was given, and callers add `git+` to what they read back:
+ * `skillpm update` built `git+git+https://…` from a manifest that already held `git+https://…`,
+ * git cannot clone that scheme, and every registry or GitHub install failed to update. Normalising
+ * here repairs manifests that already hold the doubled form and stops it growing on each update.
+ */
+export function toGitSource(raw: string): string {
+  return `git+${raw.replace(/^(?:git\+)+/, '')}`
+}
+
 export function parseGitUrl(raw: string): ParsedGitUrl {
-  // Remove git+ prefix
-  const url = raw.replace(/^git\+/, '')
+  // Remove every git+ prefix — a doubled one reaches here from `update` (see toGitSource)
+  const url = raw.replace(/^(?:git\+)+/, '')
 
   // Handle tree/branch/path syntax: https://github.com/user/repo/tree/branch/path
   const treeMatch = url.match(/^(https?:\/\/[^/]+\/[^/]+\/[^/]+)\/tree\/([^/]+)(\/.*)?$/)
@@ -39,6 +51,7 @@ export async function installFromGitUrl(
   options: InstallOptions
 ): Promise<InstallResult> {
   const parsed = parseGitUrl(rawUrl)
+  const sourceUrl = toGitSource(rawUrl)
   const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'skilldex-'))
 
   try {
@@ -59,7 +72,7 @@ export async function installFromGitUrl(
     if (skillFolders.length === 1) {
       // `await` is load-bearing: `finally` below removes the clone, and a bare `return` of the
       // promise lets that cleanup run before the copy has finished reading from it.
-      return await installFromPath(skillFolders[0], { ...options, sourceUrl: rawUrl })
+      return await installFromPath(skillFolders[0], { ...options, sourceUrl })
     }
 
     // Multiple skills found — prompt if interactive callback provided, else pick first
@@ -71,7 +84,7 @@ export async function installFromGitUrl(
       selectedName = names[0]
     }
     const selectedFolder = skillFolders.find(f => path.basename(f) === selectedName) ?? skillFolders[0]
-    return await installFromPath(selectedFolder, { ...options, sourceUrl: rawUrl })
+    return await installFromPath(selectedFolder, { ...options, sourceUrl })
   } finally {
     await rm(tmpDir, { recursive: true, force: true })
   }

@@ -51,6 +51,12 @@ describe('parseGitUrl', () => {
     expect(result.subPath).toBe('skills/my-skill')
   })
 
+  it('strips a doubled git+ prefix, as update builds from a manifest that already holds one', () => {
+    const result = parseGitUrl('git+git+https://github.com/user/repo/tree/HEAD/skills/pdf')
+    expect(result.repoUrl).toBe('https://github.com/user/repo')
+    expect(result.subPath).toBe('skills/pdf')
+  })
+
   it('handles URL without git+ prefix', () => {
     const result = parseGitUrl('https://github.com/user/repo')
     expect(result.repoUrl).toBe('https://github.com/user/repo')
@@ -121,5 +127,42 @@ describe('installFromGitUrl — onMultipleSkills callback', () => {
     const calledPath: string = mocks.installFromPath.mock.calls[0][0]
     // Should have picked one of the two skill folders (first found)
     expect(calledPath).toMatch(/skill-[ab]/)
+  })
+})
+
+describe('installFromGitUrl — recorded source URL', () => {
+  let fakeRepo: string
+
+  beforeEach(async () => {
+    fakeRepo = await mkdtemp(path.join(os.tmpdir(), 'skilldex-github-src-'))
+    await mkdir(path.join(fakeRepo, 'only-skill'))
+    await writeFile(path.join(fakeRepo, 'only-skill', 'SKILL.md'), '---\nname: only-skill\ndescription: ' + 'a'.repeat(40) + '\n---\n')
+    mocks.cloneFn.mockImplementation(async (_url: string, dest: string) => {
+      await cp(fakeRepo, dest, { recursive: true })
+    })
+    mocks.installFromPath.mockResolvedValue({
+      skillName: 'only-skill',
+      scope: 'project',
+      installedPath: '/unused',
+      validation: { score: 80, skill: 'only-skill', specVersion: '1.0', diagnostics: [], errorCount: 0, warnCount: 0 },
+      alreadyExisted: false,
+    })
+  })
+
+  afterEach(async () => {
+    await rm(fakeRepo, { recursive: true, force: true })
+    mocks.cloneFn.mockReset()
+    mocks.installFromPath.mockReset()
+  })
+
+  // update re-installs with `git+${skill.sourceUrl}`. Were the doubled prefix recorded, it would
+  // grow by one on every update; the clone must also see a URL git can fetch.
+  it('clones a plain URL and records exactly one git+ prefix, given a doubled one', async () => {
+    const { installFromGitUrl } = await import('../../src/registry/sources/github.js')
+
+    await installFromGitUrl('git+git+https://github.com/user/repo', { scope: 'project' })
+
+    expect(mocks.cloneFn.mock.calls[0][0]).toBe('https://github.com/user/repo')
+    expect(mocks.installFromPath.mock.calls[0][1].sourceUrl).toBe('git+https://github.com/user/repo')
   })
 })
