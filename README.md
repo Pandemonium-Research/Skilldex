@@ -5,7 +5,7 @@
 Skilldex is a package manager and registry for Claude `.skill` packages. It handles installation at the right scope, format validation with compiler-style feedback, quality scoring, and AI-powered skill suggestions — all while integrating natively with Claude Code, Codex, and any MCP-capable coding agent.
 
 ```bash
-skillpm install forensics-agent --scope project
+skillpm install anthropics/pdf
 skillpm validate ./my-skill
 skillpm list
 ```
@@ -73,8 +73,8 @@ moved on since.
 Both `skillpm` and `spm` are identical — `spm` is a convenience alias:
 
 ```bash
-skillpm install forensics-agent   # canonical
-spm install forensics-agent       # identical alias
+skillpm install anthropics/pdf   # canonical
+spm install anthropics/pdf       # identical alias
 ```
 
 ---
@@ -95,13 +95,17 @@ skillpm validate ./my-skill
   error   line 12: references assets/template.docx but assets/template.docx not found
   pass    Bundled resources in correct subdirectories
 
-Format conformance score: 85/100
+Format conformance score: 93/100
 Validated against: skill-format v1.0
 ```
 
 ### Install a skill
 
 ```bash
+# From the registry, by owner/name (a bare name works too; if several owners
+# publish it, skillpm asks which one)
+skillpm install anthropics/pdf
+
 # From a local path
 skillpm install ./forensics-agent --scope project
 
@@ -154,24 +158,26 @@ skillpm search ctf --tier verified --sort score --limit 20
 ```
 
 ```
-Found 3 skills for "forensics" (showing 3)
+Found 1,000+ skills for "forensics" (showing 10)
 
-forensics-agent [verified]
+acme/forensics-agent [community]
   Full forensic investigation workflow for CTF and incident response
   Score: 91/100  ·  Installs: 412  ·  Spec: v1.0
   Tags: forensics, ctf, analysis
-  skillpm install forensics-agent
+  skillpm install acme/forensics-agent
+...
 ```
+
+Results are addressed as `owner/name`: names are only unique within an owner. A count past the registry's cap reads `1,000+`.
 
 ### Publish a skill
 
 ```bash
 # Run from inside your skill directory — source URL is auto-detected from git remote
 skillpm publish --tags forensics,analysis
-
-# Re-score an already-published skill after changes
-skillpm publish --update
 ```
+
+The skill is published under your GitHub handle, as `<handle>/<name>`.
 
 Requires an auth token: get one at `https://skilldex-registry.vercel.app/v1/auth/github`, then `skillpm config set token <token>`.
 
@@ -182,7 +188,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 skillpm suggest
 ```
 
-Skilldex reads your project context (README, package.json, `.claude/` directory) and proposes relevant skills. You approve, reject, or change the scope of each before installation.
+Skilldex reads your project context (README, package.json, `.claude/` directory), searches the registry, and has a model choose from what the search returned — so every proposal is a real skill, installable by its `owner/name`. You approve, reject, or change the scope of each before installation. Needs the registry has no skill for are listed separately, with an offer to draft them.
 
 `suggest` can also run against a custom **Anthropic-compatible** endpoint (e.g. a LiteLLM proxy), which lets you front non-Claude models:
 
@@ -203,7 +209,7 @@ Full reference: [docs/cli.md](docs/cli.md)
 
 | Command | Description |
 |---|---|
-| `skillpm install <source>` | Install from local path or `git+https://` URL |
+| `skillpm install <source>` | Install from the registry (`owner/name`), a local path, or a `git+https://` URL |
 | `skillpm uninstall <name>` | Remove a skill from a scope |
 | `skillpm update [name]` | Re-fetch and reinstall a skill from its source |
 | `skillpm list` | Show all installed skills across scopes |
@@ -280,6 +286,8 @@ skillpm install my-skill --scope project   # default, this project only
 
 Each scope maintains a `skilldex.json` manifest tracking installed skills, their source, and the spec version they were validated against.
 
+Installs are linked into the directories agents read — `.agents/skills/` and `.claude/skills/` in the project for `project` scope, in your home directory for `shared` and `global` — so Claude Code, Codex, Cursor, and others pick them up. `--no-bridge` skips this.
+
 ---
 
 ## Format Validation & Scoring
@@ -294,14 +302,17 @@ The quality score measures **format conformance only** — not functionality or 
 
 | Check | Points |
 |---|---|
-| YAML frontmatter present and parseable | 25 |
-| `name` field present and non-empty | 10 |
-| `description` field present | 10 |
-| `description` meets 30-word minimum | 10 |
-| `SKILL.md` under 500 lines | 15 |
-| Only allowed subdirectories | 10 |
-| All referenced resources exist | 15 |
-| Bundled resources in correct subdirectories | 5 |
+| YAML frontmatter present and parseable | 16 |
+| `name` field present and non-empty | 16 |
+| `name` is kebab-case and uses no reserved words | 11 |
+| `description` field present | 16 |
+| `description` meets 30-word minimum | 6 |
+| `description` ≤ 1024 chars and free of XML tags | 11 |
+| `SKILL.md` under 500 lines | 7 |
+| Only allowed subdirectories | 4 |
+| No `README.md` inside the skill folder | 4 |
+| All referenced resources exist | 7 |
+| Bundled resources in correct subdirectories | 2 |
 
 Missing frontmatter is **fatal** — the skill scores 0 and no further checks run. All other failures produce diagnostics but never block installation.
 
@@ -319,9 +330,10 @@ skillpm suggest
 Before starting a build, Skilldex can propose skills based on your project:
 
 1. Reads project context (README, package.json, `.claude/` directory)
-2. Calls Claude to propose relevant skills with reasons
-3. You approve, reject, or reassign the scope of each
-4. Approved skills are installed
+2. Searches the registry with terms drawn from that context
+3. Has Claude choose the best fits from the search results, with reasons
+4. You approve, reject, or reassign the scope of each
+5. Approved skills are installed by `owner/name`
 
 This checkpoint is intentional. Most agent frameworks skip it and auto-execute. Skilldex makes it explicit.
 
