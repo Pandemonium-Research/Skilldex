@@ -83,7 +83,9 @@ export function registerPublish(program: Command): void {
             if (d.level === 'error') printError(`${loc}${d.message}`)
             else printWarning(`${loc}${d.message}`)
           }
-          printInfo(`Install with: skillpm install ${skillName}`)
+          // Qualified: the registry names the skill under the publisher's handle, and a bare name
+          // may be claimed by other owners too.
+          printInfo(`Install with: skillpm install ${result.skill.qualified_name ?? skillName}`)
         }
       } catch (e) {
         if (spinner) spinner.fail()
